@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>클린가드 — 이염 방지 세탁 시트</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <div id="stage" role="main" aria-label="광고 자극">
+      <div id="scene-layer"></div>
+      <div id="subtitle"><span id="subtitle-text"></span></div>
+    </div>
+  </div>
+
+  <aside id="debug" hidden>
+    <div class="dbg-head">
+      <strong>DEBUG</strong>
+      <button type="button" id="dbg-collapse" title="접기/펴기">▾</button>
+    </div>
+    <div class="dbg-body">
+      <div class="dbg-row" id="dbg-jump"></div>
+      <div class="dbg-row">
+        <button type="button" data-act="prev">◀ 이전</button>
+        <button type="button" data-act="playpause">⏸ 정지</button>
+        <button type="button" data-act="next">다음 ▶</button>
+        <button type="button" data-act="restart">↻ 처음</button>
+      </div>
+      <div class="dbg-row">
+        <span class="dbg-label">mode</span>
+        <button type="button" data-set="mode" data-val="watch">watch</button>
+        <button type="button" data-set="mode" data-val="intervene">intervene</button>
+        <span class="dbg-label">ver</span>
+        <button type="button" data-set="ver" data-val="A">A</button>
+        <button type="button" data-set="ver" data-val="B">B</button>
+      </div>
+      <div class="dbg-row">
+        <button type="button" data-act="finish">종료·로그 전송</button>
+        <button type="button" data-act="copy">JSON 복사</button>
+      </div>
+      <div class="dbg-row dbg-status" id="dbg-status"></div>
+      <div class="dbg-row dbg-status" id="dbg-store"></div>
+      <pre id="dbg-log"></pre>
+    </div>
+  </aside>
+
+  <script src="scenes.js"></script>
+</body>
+</html>
