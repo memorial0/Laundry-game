@@ -5,6 +5,7 @@
   "description": "이염 방지 세탁 시트 실패-수정형 광고 자극 (실험용). 자극 자체는 의존성이 없다 — jsdom은 테스트 전용.",
   "scripts": {
     "test": "node test/run.js",
+    "timing": "node test/timing.js",
     "storyboard": "node test/storyboard.js",
     "serve": "python3 -m http.server 8000"
   },
