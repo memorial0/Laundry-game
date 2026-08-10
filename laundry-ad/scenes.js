@@ -34,6 +34,26 @@
 
   var MODES = { WATCH: 'watch', INTERVENE: 'intervene' };
 
+  /* watch 조건에서 장면 6(수정 행동)을 재생하는 길이(ms) — 길이 통제의 유일한 출처.
+   * 두 조건의 차이는 "수행 주체"뿐이어야 하므로, 예비조사에서 intervene의 실제
+   * 조작 시간 중앙값이 나오면 이 값 하나만 바꾼다.
+   * 이 상수가 장면 6의 dur, watch 시연 애니메이션 길이(CSS --s6-watch-dur),
+   * 문 닫힘 시점(DOOR_CLOSE_AT 비율)을 모두 결정한다. */
+  var WATCH_S6_MS = 4000;
+
+  // 시연 애니메이션에서 문이 닫히기 시작하는 지점(재생 길이 대비 비율).
+  // 시트가 투입구 안으로 사라지는 프레임(약 66%) 직후.
+  var DOOR_CLOSE_AT = 0.6625;
+
+  /* OS "동작 줄이기" 설정 — 자극은 이 값에 따라 달라지지 않는다(속도·입자 수 고정).
+   * 참가자 간 자극 동일성을 위해 로그에만 남긴다. */
+  function readsReducedMotion() {
+    try {
+      var mq = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+      return mq ? (mq.matches ? 1 : 0) : null;
+    } catch (e) { return null; }
+  }
+
   /* ==========================================================
    * 1. URL 파라미터
    * ========================================================== */
@@ -567,7 +587,13 @@
   };
 
   // 6. 수정 행동 — watch/intervene가 같은 그림을 쓰고 "수행 주체"만 다르다
-  ART.S6 = { HOME: { x: 270, y: 1530 }, DROP: { x: 790, y: 1180 }, HIT: 190, IDLE_MS: 8000 };
+  ART.S6 = {
+    HOME: { x: 270, y: 1530 },
+    DROP: { x: 790, y: 1180 },
+    HIT: 190,
+    IDLE_MS: 8000,
+    WATCH_MS: WATCH_S6_MS   // watch 재생 길이 — 조정은 WATCH_S6_MS 한 곳에서
+  };
 
   ART.s6 = function (o) {
     o = o || {};
@@ -681,16 +707,19 @@
     attach: function (el, ctx) {
       var S = ART.S6;
       var timers = [];
+      var enteredAt = performance.now();     // 장면 6 진입 시점(조작 지연 계산 기준)
       function later(fn, ms) { var t = setTimeout(fn, ms); timers.push(t); return t; }
-      el.__cleanup = function () {
-        for (var i = 0; i < timers.length; i++) clearTimeout(timers[i]);
-        timers.length = 0;
-      };
 
       if (ctx.cfg.mode !== MODES.INTERVENE) {
-        // watch: 4초 시연 애니메이션 (참가자 입력 없음)
+        // watch: 광고 속 인물의 손이 같은 경로로 시트를 넣는다(참가자 입력 없음).
+        // 재생 길이는 WATCH_S6_MS 하나가 결정한다 — CSS 애니메이션도 같은 값을 쓴다.
+        el.__cleanup = function () {
+          for (var i = 0; i < timers.length; i++) clearTimeout(timers[i]);
+          timers.length = 0;
+        };
         el.classList.add('is-watch');
-        later(function () { el.classList.add('is-closed'); }, 2650);
+        el.style.setProperty('--s6-watch-dur', S.WATCH_MS + 'ms');
+        later(function () { el.classList.add('is-closed'); }, S.WATCH_MS * DOOR_CLOSE_AT);
         return;
       }
 
@@ -699,6 +728,18 @@
       var pos = { x: S.HOME.x, y: S.HOME.y };
       var grab = { x: 0, y: 0 };
       var dragging = false, done = false, idle = null;
+      var firstDownAt = 0;   // 첫 pointerdown (performance.now)
+
+      /* 조작 시간 집계 — 성공하면 성공 시점까지, 미완료로 장면을 떠나면 그때까지 */
+      function commitManip(at) {
+        if (!firstDownAt) return;
+        ctx.log.T_MANIP = round2((at - firstDownAt) / 1000);
+      }
+      el.__cleanup = function () {
+        for (var i = 0; i < timers.length; i++) clearTimeout(timers[i]);
+        timers.length = 0;
+        if (!done) commitManip(performance.now());
+      };
 
       function place(x, y, extra) {
         sheet.style.transform = 'translate(' + x + 'px,' + y + 'px)' + (extra || '');
@@ -734,6 +775,10 @@
         if (done) return;
         ev.preventDefault();
         dragging = true;
+        if (!firstDownAt) {                  // 드래그 시작까지 걸린 시간(초)
+          firstDownAt = performance.now();
+          ctx.log.T_FIRST_DRAG = round2((firstDownAt - enteredAt) / 1000);
+        }
         var u = toUser(ev);
         grab.x = u.x - pos.x;
         grab.y = u.y - pos.y;
@@ -775,6 +820,7 @@
         done = true;
         hideHint();
         clearTimeout(idle);
+        commitManip(performance.now());
         ctx.log.INT_DONE = 1;
         el.classList.add('is-dropped');
         sheet.style.transition = 'transform 420ms cubic-bezier(.4,0,.2,1), opacity 260ms 200ms linear';
@@ -836,12 +882,14 @@
     {
       no: 6,
       title: '수정 행동',
-      // watch: 4초 고정 / intervene: 가변(드롭 성공 시 진행)
-      dur: CFG.mode === MODES.INTERVENE ? null : 4,
+      // watch: WATCH_S6_MS 고정 / intervene: 가변(드롭 성공 시 진행)
+      get dur() {
+        return CFG.mode === MODES.INTERVENE ? null : ART.S6.WATCH_MS / 1000;
+      },
+      // 자막도 같은 어간을 공유하고 "수행 주체"를 나타내는 끝맺음만 다르다
       subtitle: function () {
-        return CFG.mode === MODES.INTERVENE
-          ? '시트를 세탁기 안으로 끌어다 놓아 주세요'
-          : '시트 한 장을 넣기만 하면';
+        return '시트 한 장을 세탁기 안에 ' +
+          (CFG.mode === MODES.INTERVENE ? '넣어 주세요' : '넣기만 하면');
       },
       render: function (ctx) {
         var el = ART.svg(ART.s6({ still: CFG.still !== null }), 'sc6');
@@ -894,6 +942,29 @@
     }
   ];
 
+  /* ----------------------------------------------------------
+   * 2-4. 조건별 재생 목록
+   *
+   *  watch     — 실패까지만 보여주고 제품 메시지로 끝난다. 되감기(5)와
+   *              수정·개선 흐름(6~9)이 없다.
+   *  intervene — 실패 → 되감기 → 참가자 개입 → 개선까지 전부 재생한다.
+   *
+   *  장면 "정의"는 위 SCENES 하나뿐이다. 여기서는 어떤 장면을 재생할지만
+   *  고른다 — 그래서 두 조건이 공유하는 장면(1·2·3·4·10)은 여전히 같은
+   *  렌더 함수·같은 자막·같은 길이를 쓴다(조건별 장면을 따로 만들지 않는다).
+   * ---------------------------------------------------------- */
+
+  var PLAYLIST = {
+    watch: [1, 2, 3, 4, 10],
+    intervene: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  };
+
+  function playlistFor(mode) {
+    return (PLAYLIST[mode] || PLAYLIST[MODES.WATCH]).map(function (no) {
+      return SCENES.filter(function (s) { return s.no === no; })[0];
+    });
+  }
+
   /* ==========================================================
    * 3. 로그 — 행동 로그 시트 스키마와 1:1 (SPEC 5장)
    * ========================================================== */
@@ -907,12 +978,17 @@
     t_start: 0,                                    // epoch ms, 장면 1 시작
     t_end: 0,                                      // epoch ms, 종료(0 = 미완료)
     DWELL_TOTAL: 0,                                // 초
-    DWELL_INT: 0,                                  // 초, 장면 6 체류
+    // 장면 6 체류(초). watch는 그 장면 자체가 없으므로 공란 의미로 null
+    DWELL_INT: CFG.mode === MODES.INTERVENE ? 0 : null,
     INT_DONE: CFG.mode === MODES.INTERVENE ? 0 : null, // watch는 공란 의미로 null
-    INT_ATTEMPTS: 0,                               // 스냅백 횟수
+    INT_ATTEMPTS: 0,                               // 목표 밖 드롭(스냅백) 횟수
+    T_FIRST_DRAG: null,                            // 초, 장면 6 진입~첫 드래그 시작. watch/미조작은 null
+    T_MANIP: null,                                 // 초, 첫 드래그~성공(미완료면 장면 이탈까지). watch는 null
     HINT_SHOWN: 0,                                 // 힌트 노출 횟수
     CTA_CLICK: 0,
-    scene_times: {}
+    REDUCED_MOTION: readsReducedMotion(),          // OS 동작 줄이기 설정. 자극에는 영향 없음(기록 전용)
+    scene_times: {},                               // 장면별 체류(초)
+    scene_enter: {}                                // 장면별 최초 진입 시각(epoch ms)
   };
   window.AD_RESULT = LOG;
 
@@ -924,9 +1000,13 @@
 
     /** 스키마 순서를 고정한 사본 */
     snapshot: function () {
-      var st = {};
-      Object.keys(LOG.scene_times).sort(function (a, b) { return a - b; })
-        .forEach(function (k) { st[k] = LOG.scene_times[k]; });
+      var byNo = function (src) {
+        var out = {};
+        Object.keys(src).sort(function (a, b) { return a - b; })
+          .forEach(function (k) { out[k] = src[k]; });
+        return out;
+      };
+      var st = byNo(LOG.scene_times);
       return {
         sid: LOG.sid,
         mode: LOG.mode,
@@ -937,9 +1017,13 @@
         DWELL_INT: LOG.DWELL_INT,
         INT_DONE: LOG.INT_DONE,
         INT_ATTEMPTS: LOG.INT_ATTEMPTS,
+        T_FIRST_DRAG: LOG.T_FIRST_DRAG,
+        T_MANIP: LOG.T_MANIP,
         HINT_SHOWN: LOG.HINT_SHOWN,
         CTA_CLICK: LOG.CTA_CLICK,
-        scene_times: st
+        REDUCED_MOTION: LOG.REDUCED_MOTION,
+        scene_times: st,
+        scene_enter: byNo(LOG.scene_enter)
       };
     },
 
@@ -985,7 +1069,18 @@
     remaining: 0,        // 일시정지 시 남은 시간(ms)
     current: null,       // 현재 장면 DOM
 
-    get scene() { return SCENES[this.idx] || null; },
+    // 현재 조건의 재생 목록. boot()에서 채운다(?still은 전 장면 접근을 허용)
+    list: [],
+
+    get scene() { return this.list[this.idx] || null; },
+
+    /** 장면 번호로 이동 — 조건마다 목록이 다르므로 인덱스 대신 번호로 찾는다 */
+    gotoNo: function (no) {
+      for (var i = 0; i < this.list.length; i++) {
+        if (this.list[i].no === no) { this.goto(i); return true; }
+      }
+      return false;   // 이 조건에는 없는 장면
+    },
 
     start: function () {
       LOG.t_start = Date.now();
@@ -995,12 +1090,14 @@
 
     /** 장면 인덱스로 이동 */
     goto: function (idx) {
-      if (idx < 0 || idx >= SCENES.length) return;
+      if (idx < 0 || idx >= this.list.length) return;
       this.clearTimer();
       this.commitDwell();
 
       this.idx = idx;
-      var scene = SCENES[idx];
+      var scene = this.list[idx];
+      // 장면별 진입 시각 — 최초 진입만 남긴다(디버그 점프로 되돌아와도 덮어쓰지 않음)
+      if (LOG.scene_enter[scene.no] === undefined) LOG.scene_enter[scene.no] = Date.now();
 
       // 렌더 & 교차 전환
       var prev = this.current;
@@ -1044,7 +1141,7 @@
     /** 현재 장면 체류시간을 로그에 누적 */
     commitDwell: function () {
       if (this.idx < 0) return;
-      var scene = SCENES[this.idx];
+      var scene = this.list[this.idx];
       var elapsed = (performance.now() - this.sceneEnteredAt) / 1000;
       var key = String(scene.no);
       LOG.scene_times[key] = round2((LOG.scene_times[key] || 0) + elapsed);
@@ -1056,7 +1153,7 @@
     },
 
     next: function () {
-      if (this.idx >= SCENES.length - 1) { this.finish(); return; }
+      if (this.idx >= this.list.length - 1) { this.finish(); return; }
       this.goto(this.idx + 1);
     },
 
@@ -1091,11 +1188,14 @@
       this.finished = false;
       this.idx = -1;
       LOG.scene_times = {};
+      LOG.scene_enter = {};
       LOG.t_end = 0;
       LOG.DWELL_TOTAL = 0;
       LOG.DWELL_INT = 0;
       LOG.INT_DONE = CFG.mode === MODES.INTERVENE ? 0 : null;
       LOG.INT_ATTEMPTS = 0;
+      LOG.T_FIRST_DRAG = null;
+      LOG.T_MANIP = null;
       LOG.HINT_SHOWN = 0;
       LOG.CTA_CLICK = 0;
       delete document.documentElement.dataset.state;
@@ -1134,6 +1234,8 @@
 
     /** ?still=N 정지 화면 */
     renderStill: function (no) {
+      // 스토리보드 캡처는 조건과 무관하게 전 장면에 접근한다
+      this.list = SCENES;
       var idx = SCENES.findIndex(function (s) { return s.no === no; });
       if (idx < 0) idx = 0;
       this.playing = false;
@@ -1163,7 +1265,7 @@
 
       // 장면 점프 버튼
       var jump = document.getElementById('dbg-jump');
-      SCENES.forEach(function (s, i) {
+      Engine.list.forEach(function (s, i) {
         var b = document.createElement('button');
         b.type = 'button';
         b.textContent = s.no;
@@ -1251,7 +1353,9 @@
 
       var elapsed = Engine.idx >= 0 ? (performance.now() - Engine.sceneEnteredAt) / 1000 : 0;
       this.status.textContent =
-        '장면 ' + (s ? s.no + ' ' + s.title : '-') +
+        // 조건명은 debug 패널에만 노출된다 (참가자 화면에는 어디에도 표시하지 않는다)
+        CFG.mode + '/' + CFG.ver +
+        ' · 장면 ' + (s ? s.no + ' ' + s.title : '-') +
         ' · ' + elapsed.toFixed(1) + 's' +
         (s && s.dur !== null ? ' / ' + s.dur + 's' : ' / 가변') +
         (Engine.finished ? ' · 종료' : '');
@@ -1283,6 +1387,9 @@
 
     document.documentElement.dataset.mode = CFG.mode;
     document.documentElement.dataset.ver = CFG.ver;
+
+    // 조건별 재생 목록 — Debug 패널이 이 목록으로 점프 버튼을 만들므로 먼저 정한다
+    Engine.list = CFG.still !== null ? SCENES : playlistFor(CFG.mode);
 
     // 중도 이탈 대비 — 스키마 그대로 저장하되 t_end = 0 (미완료)
     window.addEventListener('pagehide', function () {
