@@ -311,3 +311,13 @@ small {
   padding-left: 20px;
   margin-top: 5px;
 }
+
+/* 통합 러너용 디버그 표시 (?debug=1) — 참가자에게는 보이지 않는다 */
+.dbg-line {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 14px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
