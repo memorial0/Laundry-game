@@ -37,7 +37,6 @@ export var CFG = {
   ver: pick(qs.get('ver'), ['A', 'B'], 'A'),
   sid: qs.get('sid') || randomSid(),
   block: qs.get('block') ? parseInt(qs.get('block'), 10) : null,
-  sound: qs.get('sound') !== '0',
   debug: qs.get('debug') === '1'
 };
 

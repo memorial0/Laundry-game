@@ -321,3 +321,14 @@ small {
   white-space: pre-wrap;
   word-break: break-all;
 }
+
+.dbg-overlay {
+  position: absolute;
+  top: 4px;
+  left: 8px;
+  right: 8px;
+  z-index: 20;
+  margin: 0;
+  pointer-events: none;
+  color: #00ffcc;
+}

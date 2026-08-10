@@ -11,92 +11,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CFG, LOG, IS_TUTORIAL, IS_INTERVENE, finish, secondsSince } from './stimulus';
 
-// --- 사운드 매니저 (Web Audio API) ---
-const createSoundManager = () => {
-  let ctx = null;
 
-  const init = () => {
-    if (!CFG.sound) return;
-    if (!ctx) {
-      ctx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (ctx.state === 'suspended') {
-      ctx.resume();
-    }
-  };
-
-  const playOsc = (freq, type, duration, volume, decay = 0.1) => {
-    if (!ctx) return;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, ctx.currentTime);
-    gain.gain.setValueAtTime(volume, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + duration);
-  };
-
-  return {
-    init,
-    playGate: (isPositive) => {
-      init();
-      if (isPositive) {
-        playOsc(660, 'sine', 0.1, 0.15);
-        setTimeout(() => playOsc(880, 'sine', 0.1, 0.1), 50);
-      } else {
-        playOsc(220, 'sine', 0.15, 0.2);
-      }
-    },
-    playCollision: () => {
-      init();
-      // Noise-like sound using square wave and quick decay
-      playOsc(110, 'square', 0.3, 0.2);
-      playOsc(55, 'sawtooth', 0.4, 0.2);
-    },
-    playSuccess: () => {
-      init();
-      const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
-      notes.forEach((freq, i) => {
-        setTimeout(() => playOsc(freq, 'sine', 0.4, 0.15 - i * 0.02), i * 100);
-      });
-    },
-    playClick: () => {
-      init();
-      playOsc(1200, 'sine', 0.05, 0.1);
-    },
-    playRewind: () => {
-      init();
-      if (!ctx) return;
-      // Series of rising chirps
-      for (let i = 0; i < 5; i++) {
-        setTimeout(() => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.frequency.setValueAtTime(100 + i * 200, ctx.currentTime);
-          osc.frequency.exponentialRampToValueAtTime(1000 + i * 200, ctx.currentTime + 0.1);
-          gain.gain.setValueAtTime(0.1, ctx.currentTime);
-          gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.1);
-          osc.connect(gain); gain.connect(ctx.destination);
-          osc.start(); osc.stop(ctx.currentTime + 0.1);
-        }, i * 60);
-      }
-    },
-    playIntervention: () => {
-      init();
-      playOsc(440, 'sine', 0.2, 0.2);
-      setTimeout(() => playOsc(880, 'sine', 0.4, 0.15), 100);
-    }
-  };
-};
-
-const soundManager = createSoundManager();
-
-/** 자극 하나의 진행 단계 — 러너가 붙기 전의 STAGES(인트로·설문·완료)는 전부 없앴다 */
+/** 자극 하나의 진행 단계 — 러너가 붙기 전의 STAGES(인트로·설문·완료)는 전부 없앴다.
+ *  시작 화면도 없다. 세탁 자극과 마찬가지로 러너가 iframe 을 띄우는 순간 바로 재생된다. */
 const STAGES = {
-  READY: 'ready',   // 시작 버튼. Web Audio 는 이 iframe 안의 클릭이 있어야 소리를 낸다
   PLAY: 'play',
   ENDED: 'ended'    // 종료 통지 후 러너가 화면을 걷어갈 때까지의 대기 화면
 };
@@ -143,10 +61,9 @@ const resolveTimeline = () => {
 };
 
 const MicrogateExperiment = () => {
-  const [stage, setStage] = useState(STAGES.READY);
+  const [stage, setStage] = useState(STAGES.PLAY);
   const [gamePhase, setGamePhase] = useState('none');
   const [gameResult, setGameResult] = useState('');
-  const [isSlowMo, setIsSlowMo] = useState(false);
 
   const canvasRef = useRef(null);
   const reqRef = useRef(null);
@@ -170,20 +87,21 @@ const MicrogateExperiment = () => {
       timeline: resolveTimeline(),
       shake: 0, resultAnim: { type: '', t: 0 }, vignette: 0, failReason: '', isEnding: false
     };
-    setIsSlowMo(false);
     // 튜토리얼은 처음부터 참가자가 조작한다. 본 자극은 두 조건 모두 자동 재생 실패로 시작한다.
     setGamePhase(IS_TUTORIAL ? 'tutorial_play' : 'autoplay_fail_watch');
     input.current = { left: false, right: false, mouseX: null };
   };
 
-  const startStimulus = () => {
-    soundManager.init();   // 이 클릭이 Web Audio 를 깨우는 유일한 제스처다
-    soundManager.playClick();
+  /* 마운트 즉시 재생 — 시작 버튼이 없다(세탁 자극과 동일).
+   * StrictMode 는 개발 모드에서 effect 를 두 번 실행하므로 t_start 가 덮어써지지 않게 막는다. */
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
     initGame();
     LOG.t_start = Date.now();
     marks.current = { interveneStart: 0, firstDrag: 0 };
-    setStage(STAGES.PLAY);
-  };
+  }, []);
 
   const spawnParticles = (x, y, count, color, speed = 5, size = 3) => {
     for (let i = 0; i < count; i++) {
@@ -209,7 +127,6 @@ const MicrogateExperiment = () => {
     const success = result === 'rescue_success' || result === 'tutorial_done';
 
     if (success) {
-      soundManager.playSuccess();
       state.resultAnim = { type: result === 'rescue_success' ? '개입 성공' : '연습 완료', t: 1.0 };
       state.vignette = -2.5; state.flash = 1.0; state.shake = 12;
       state.ship.vy = -18; state.ship.vx = 0;
@@ -254,12 +171,10 @@ const MicrogateExperiment = () => {
         if (s.x + s.w / 2 > g.x1 && s.x + s.w / 2 < g.x1 + g.w1) {
           state.ship.power += g.p1; g.passed = true; LOG.GATES_PASSED++;
           spawnParticles(s.x + s.w / 2, g.y + 20, 15, g.p1 > 0 ? '#00ffcc' : '#ff3366', 4);
-          soundManager.playGate(g.p1 > 0);
         }
         else if (s.x + s.w / 2 > g.x2 && s.x + s.w / 2 < g.x2 + g.w2) {
           state.ship.power += g.p2; g.passed = true; LOG.GATES_PASSED++;
           spawnParticles(s.x + s.w / 2, g.y + 20, 15, g.p2 > 0 ? '#00ffcc' : '#ff3366', 4);
-          soundManager.playGate(g.p2 > 0);
         }
         if (state.ship.power <= 0) onFail('POWER DEPLETED');
       }
@@ -269,7 +184,6 @@ const MicrogateExperiment = () => {
         if (state.ship.power >= e.hp) {
           state.ship.power -= e.hp; e.dead = true; state.shake = 12; state.flash = 0.35;
           spawnParticles(e.x + e.w / 2, e.y + e.h / 2, 20, '#ff3366', 7);
-          soundManager.playGate(false); // Thud sound
         }
         else onFail(`HP ${e.hp} > POWER ${state.ship.power}`);
       }
@@ -325,8 +239,8 @@ const MicrogateExperiment = () => {
         }
         const imminentEnemy = state.enemies.find(e => !e.dead && e.y + e.h > state.ship.y - 80 && e.y < state.ship.y + state.ship.h);
         if (imminentEnemy && state.ship.power < imminentEnemy.hp) {
-          state.slowFactor = Math.max(0.1, state.slowFactor - 0.04); setIsSlowMo(true);
-        } else { state.slowFactor = Math.min(1.0, state.slowFactor + 0.1); setIsSlowMo(false); }
+          state.slowFactor = Math.max(0.1, state.slowFactor - 0.04);
+        } else { state.slowFactor = Math.min(1.0, state.slowFactor + 0.1); }
       } else {
         state.time++; state.slowFactor = 1.0;
         if (input.current.mouseX !== null) {
@@ -341,7 +255,6 @@ const MicrogateExperiment = () => {
         state.flash = 0.8; state.shake = 35; state.vignette = 1.0; state.failReason = reason;
         spawnParticles(state.ship.x + state.ship.w / 2, state.ship.y + state.ship.h / 2, 35, '#ffcc33', 12, 4);
         spawnParticles(state.ship.x + state.ship.w / 2, state.ship.y + state.ship.h / 2, 25, '#ff3366', 8, 6);
-        soundManager.playCollision();
 
         if (IS_TUTORIAL) { endStimulus('tutorial_fail'); return; }
         if (gamePhase === 'rewind_rescue') { endStimulus('rescue_fail'); return; }
@@ -356,7 +269,7 @@ const MicrogateExperiment = () => {
         setTimeout(() => {
           if (gamePhase !== 'ended') {
             setGamePhase('rewind_watch');
-            setTimeout(() => { setGamePhase('rewind_back'); soundManager.playRewind(); }, 1000);
+            setTimeout(() => { setGamePhase('rewind_back'); }, 1000);
           }
         }, 800);
       });
@@ -367,10 +280,9 @@ const MicrogateExperiment = () => {
         for (let i = 0; i < 15; i++) { if (state.history.length > 0) { const p = state.history.pop(); Object.assign(state, p); } }
       } else if (!marks.current.interveneStart) {
         /* setGamePhase 는 비동기라 다음 렌더까지 이 분기가 몇 프레임 더 돌 수 있다.
-         * 기준 시각을 덮어쓰거나 효과음을 겹쳐 내지 않도록 진입을 한 번으로 막는다. */
+         * 기준 시각을 덮어쓰지 않도록 진입을 한 번으로 막는다. */
         marks.current.interveneStart = Date.now();   // 개입 구간 진입 — DWELL_INT 의 기준점
         setGamePhase('rewind_rescue');
-        soundManager.playIntervention();
       }
     }
 
@@ -490,30 +402,14 @@ const MicrogateExperiment = () => {
 
   return (
     <div className="microgate-app">
-      {stage === STAGES.READY && (
-        <div className="card intro-card">
-          <h1 className="logo">MICROGATE</h1>
-          <div className="cond-display">
-            {IS_TUTORIAL ? (
-              <><h3>[ 조작 연습 ]</h3><p>마우스나 손가락을 좌우로 움직여 기체를 옮기고, <strong>파워를 높이는 게이트</strong>를 지나가세요.</p></>
-            ) : IS_INTERVENE ? (
-              <><h3>[ 개입형 ]</h3><p>실패 장면이 지나간 뒤 되감기 시점부터 <strong>직접 조작해 결과를 바꾸십시오.</strong></p></>
-            ) : (
-              <><h3>[ 시청형 ]</h3><p>조작 없이 <strong>보기만</strong> 하시면 됩니다.</p></>
-            )}
-          </div>
-          <button className="btn primary" onClick={startStimulus}>시작</button>
+      {stage === STAGES.PLAY && (
+        <div className="game-container">
           {CFG.debug && (
-            <p className="dbg-line">
-              sid={CFG.sid} · mode={CFG.mode} · ver={CFG.ver} · block={String(CFG.block)}
+            <p className="dbg-line dbg-overlay">
+              sid={CFG.sid} · mode={CFG.mode} · ver={CFG.ver} · block={String(CFG.block)} · {gamePhase}
               {LOG.VER_FALLBACK ? ' · ⚠ ver=B 없음 → A 재생' : ''}
             </p>
           )}
-        </div>
-      )}
-
-      {stage === STAGES.PLAY && (
-        <div className="game-container">
           {IS_TUTORIAL && (
             <div className="tutorial-overlay" style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.7)', padding: '10px 20px', borderRadius: '20px', zIndex: 10, pointerEvents: 'none', width: 'auto', textAlign: 'center', color: '#00ffcc', border: '1px solid #00ffcc' }}>마우스/드래그로 좌우로 이동하여 파워를 높이세요!</div>
           )}
