@@ -375,6 +375,10 @@ const MicrogateExperiment = () => {
     if (gamePhase === 'ended') { ctx.fillStyle = gameResult === 'success' ? 'rgba(0, 40, 30, 0.15)' : 'rgba(0, 0, 0, 0.45)'; ctx.fillRect(0, 0, width, height); }
   }, [gamePhase, gameResult, endStimulus]);
 
+  /* 진행 상태를 밖으로 노출한다 — 테스트 하네스가 화면을 볼 수 없으므로 이 값으로 단계를 읽는다.
+   * 세탁 자극이 window.AD_ENGINE 을 노출하는 것과 같은 목적이다. */
+  useEffect(() => { window.AD_PHASE = gamePhase; }, [gamePhase]);
+
   useEffect(() => {
     if (stage === STAGES.PLAY) {
       const loop = () => { if (gamePhase !== 'ended' || gameResult === 'success') updateGame(); reqRef.current = requestAnimationFrame(loop); };
