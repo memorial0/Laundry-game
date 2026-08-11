@@ -71,6 +71,7 @@ export var LOG = {
   REDUCED_MOTION: readsReducedMotion(),
   // --- 게임 전용 ---
   RESULT: '',             // scripted_fail | rescue_success | rescue_fail
+  FAIL_REASON: null,      // 마지막 실패 사유 문자열 (성공으로 끝나면 그대로 null)
   COLLISION_T: null,      // 초, 자극 시작~자동재생 충돌
   POWER_END: null,
   GATES_PASSED: 0,

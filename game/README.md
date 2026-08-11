@@ -8,9 +8,21 @@
 
 ```bash
 npm install
-npm run dev     # vite dev 서버 (기본 4173, 점유 시 자동 증가)
-npm run build   # dist/ 로 정적 빌드 — 통합 러너가 iframe으로 읽는 산출물
+npm run dev        # vite dev 서버 (기본 4173, 점유 시 자동 증가)
+npm run build      # dist/ 로 정적 빌드 — 통합 러너가 iframe으로 읽는 산출물
+npm test           # 세 조건을 jsdom 에서 끝까지 재생해 단계·로그·길이 확인 (약 1분 40초)
+npm run difficulty # 개입 구간 성공률을 조작 정책별로 측정 (약 1분)
 ```
+
+## 길이·난이도를 고치는 자리
+
+- 길이: `RESCUE_SEC`·`TUTORIAL_SEC`·`REWIND_SEC` 상수와 `MAIN_TIMELINE_A` 의 `t`(초).
+  고친 뒤 `npm test` 로 실측한다. 목표는 세탁 자극과 같은 watch 31초 / intervene 55초.
+- 난이도: 게이트의 이득/손해 값과 적 HP. 고친 뒤 `npm run difficulty` 로 확인한다.
+  **손해 상자는 반드시 음수여야 한다** — 둘 다 양수면 아무 데나 지나도 파워가 올라
+  "개입이 결과를 바꾼다"는 조작 자체가 성립하지 않는다(실제로 그랬고, 무조작 성공률이 100%였다).
+- 되감기 지점(`REWIND_SEC`)은 자동 조종의 첫 오판보다 **앞**이어야 한다. 이미 손해를 본
+  지점에서 시작하면 참가자가 만회할 수 없어 성공률이 0%가 된다.
 
 ## 걷어낸 것 (통합 러너가 대신한다)
 

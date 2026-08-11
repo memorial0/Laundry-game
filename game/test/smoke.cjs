@@ -10,7 +10,7 @@
  */
 'use strict';
 
-const { build, bootPage, movePointer, wait, suite } = require('./lib/harness.cjs');
+const { build, bootPage, movePointer, attentive, wait, suite } = require('./lib/harness.cjs');
 
 const POLL = 50;
 const CAP = 180000;          // 안전 상한(ms)
@@ -23,9 +23,12 @@ const CONDITIONS = [
 ];
 const name = c => c.mode;
 
-/** 개입·튜토리얼 구간에서 좌우로 훑으며 조작한다. 잘 하는 참가자를 흉내내지는 않는다. */
-function steer(window, tick) {
-  movePointer(window, 60 + (Math.sin(tick / 6) + 1) * 180);
+/* 개입·튜토리얼 구간의 조작은 '주의를 기울이는 참가자'(harness.attentive)로 흉내낸다.
+ * 여기서 재는 개입형 길이는 **구출에 성공했을 때**의 길이다 — 실패하면 그만큼 짧게 끝난다. */
+function steer(window) {
+  if (!window.AD_STATE) return;
+  const x = attentive(window.AD_STATE);
+  movePointer(window, Math.max(10, Math.min(470, x)));
 }
 
 /** 한 조건을 끝까지 재생시키며 단계 전이를 기록한다 */
@@ -37,7 +40,6 @@ async function play(cond, bundle) {
   const t0 = Date.now();
   const marks = [];            // {phase, at}
   let rescueAt = 0;
-  let tick = 0;
   let end = 0;
 
   while (Date.now() - t0 < CAP) {
@@ -48,7 +50,7 @@ async function play(cond, bundle) {
     // 참가자가 조작해야 하는 구간에서만 포인터를 움직인다
     if (phase === 'rewind_rescue' || phase === 'tutorial_play') {
       if (!rescueAt) rescueAt = Date.now();
-      if (Date.now() - rescueAt > RESCUE_THINK) steer(w, tick++);
+      if (Date.now() - rescueAt > RESCUE_THINK) steer(w);
     }
 
     if (w.__messages.some(m => m && m.type === 'AD_DONE')) { end = Date.now(); break; }

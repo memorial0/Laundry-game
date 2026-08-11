@@ -19,43 +19,107 @@ const STAGES = {
   ENDED: 'ended'    // 종료 통지 후 러너가 화면을 걷어갈 때까지의 대기 화면
 };
 
-// --- 타임라인 데이터 ---
+/* 캔버스 좌표계 — 로직은 이 크기 안에서만 계산한다(화면 크기와 무관) */
+const CANVAS_W = 480;
+const CANVAS_H = 720;
+
+/* 로직 틱 — 타임라인의 t 단위가 곧 이 틱이다. 60틱 = 1초.
+ * 화면 주사율이 얼마든 1초에 TICK_HZ 번만 돈다. */
+const TICK_HZ = 60;
+const TICK_MS = 1000 / TICK_HZ;
+const MAX_FRAME_MS = 250;        // 한 프레임에서 인정할 최대 경과 시간
+const MAX_CATCHUP_STEPS = 5;     // 밀렸을 때 한 프레임에 몰아 돌릴 틱 수 상한
+
+/** 초 → 타임라인 틱 */
+const sec = s => Math.round(s * TICK_HZ);
+
+/* 자극 길이 — 세탁 자극(SPEC 3장: watch 31초, intervene 55초 고정 + 조작 시간)에 맞춘다.
+ * 여기 숫자만 고치고 test/smoke.cjs 로 실측해 확인한다. */
+const RESCUE_SEC = 20.3;    // 개입 구간에서 살아남아야 하는 시간
+const TUTORIAL_SEC = 8;     // 조작 연습 길이
+const REWIND_SEC = 14;      // 실패 지점에서 되감아 돌아가는 깊이 (되돌림 기록 상한이기도 하다).
+                            // 자동 조종의 첫 오판(13.7초)보다 앞으로 돌아가야 한다 —
+                            // 이미 손해를 본 상태에서 시작하면 참가자가 만회할 수 없다
+const REWIND_FLOOR_SEC = 3; // 아무리 되감아도 이 시각 이전으로는 가지 않는다
+const REWIND_SPEED = 15;    // 되감기 한 틱에 되돌릴 기록 수 — 클수록 빨리 되감긴다
+
+/* ----------------------------------------------------------
+ * 타임라인 — t 는 초. 게이트는 좌/우 두 상자 중 하나를 지나며 파워가 변하고,
+ * 적은 파워가 HP 이상일 때만 통과한다(그만큼 파워가 깎인다).
+ *
+ * autoTarget 은 **자동 재생이 겨냥할 x 좌표**다. 즉 "광고 속 자동 조종이 어떤
+ * 선택을 하는가"를 여기서 정한다. 실패는 조작 미숙이 아니라 이 선택의 결과여야 한다 —
+ * 세탁 자극에서 실패 원인을 "시트를 넣지 않음" 하나로 제한한 것과 같은 요구다.
+ * ---------------------------------------------------------- */
+
+const gate = (t, left, right, autoTarget) => {
+  const g = { type: 'gate', t: sec(t), x1: left.x, w1: left.w, p1: left.p, x2: right.x, w2: right.w, p2: right.p };
+  if (autoTarget != null) g.autoTarget = autoTarget;
+  return g;
+};
+const foe = (t, x, w, h, hp) => ({ type: 'enemy', t: sec(t), x, w, h, hp });
+
 const TUTORIAL_TIMELINE = [
-  { type: 'gate', t: 40, x1: 20, w1: 180, p1: 10, x2: 280, w2: 180, p2: 5 },
-  { type: 'enemy', t: 120, x: 140, w: 200, h: 60, hp: 3 },
-  { type: 'gate', t: 200, x1: 20, w1: 180, p1: 5, x2: 280, w2: 180, p2: 15 },
-  { type: 'enemy', t: 300, x: 80, w: 320, h: 80, hp: 8 }
+  gate(0.7, { x: 20, w: 180, p: 10 }, { x: 280, w: 180, p: 5 }),
+  foe(2.0, 140, 200, 60, 3),
+  gate(3.3, { x: 20, w: 180, p: 5 }, { x: 280, w: 180, p: 15 }),
+  foe(5.0, 80, 320, 80, 8)
 ];
 
-const MAIN_TIMELINE = [
-  { type: 'gate', t: 40, x1: 20, w1: 100, p1: 12, x2: 130, w2: 330, p2: 5, autoTarget: 295 },
-  { type: 'enemy', t: 110, x: 300, w: 100, h: 50, hp: 3 },
-  { type: 'enemy', t: 170, x: 140, w: 200, h: 80, hp: 7 },
-  { type: 'gate', t: 240, x1: 300, w1: 150, p1: 3, x2: 20, w2: 270, p2: 1, autoTarget: 155 },
-  { type: 'gate', t: 310, x1: 20, w1: 330, p1: 6, x2: 360, w2: 100, p2: 15, autoTarget: 185 },
-  { type: 'enemy', t: 380, x: 40, w: 120, h: 50, hp: 4 },
-  { type: 'enemy', t: 450, x: 100, w: 280, h: 80, hp: 6 },
-  { type: 'gate', t: 520, x1: 200, w1: 260, p1: 10, x2: 20, w2: 170, p2: 2, autoTarget: 105 },
-  { type: 'gate', t: 600, x1: 20, w1: 150, p1: 15, x2: 180, w2: 280, p2: 5, autoTarget: 320 },
-  { type: 'enemy', t: 680, x: 50, w: 150, h: 60, hp: 8 },
-  { type: 'enemy', t: 760, x: 90, w: 300, h: 100, hp: 15 },
-  { type: 'gate', t: 850, x1: 20, w1: 210, p1: 20, x2: 250, w2: 210, p2: 10 },
-  { type: 'enemy', t: 940, x: 140, w: 200, h: 70, hp: 12 },
-  { type: 'gate', t: 1020, x1: 20, w1: 100, p1: 25, x2: 130, w2: 330, p2: 5 },
-  { type: 'enemy', t: 1120, x: 40, w: 400, h: 100, hp: 20 }
+/* ver A.
+ * 게이트마다 **이득 상자와 손해 상자**가 한 쌍이다. 손해 쪽이 마이너스여야 선택이 선택이 된다 —
+ * 둘 다 플러스면 아무 데나 지나도 파워가 올라 "개입이 결과를 바꾼다"는 조작이 성립하지 않는다.
+ *
+ * 자동 조종(autoTarget)은 전반에는 맞게 고르다가 후반에 계속 손해 쪽을 골라 파워를 잃고,
+ * 마지막 큰 적 앞에서 멈춘다. 인물을 무능하게 그리지 않기 위해 후반에도 몇 번은 맞게 고른다.
+ * 실패 지점 이후에도 게이트·적이 이어진다 — 개입 조건에서 참가자가 그 구간을 직접 지나기 때문이다.
+ *
+ * 적은 x 폭이 좁으면 피할 수 있고, 화면을 거의 채우면 파워로만 통과한다.
+ */
+const MAIN_TIMELINE_A = [
+  gate(0.7, { x: 20, w: 210, p: 8 }, { x: 250, w: 210, p: -4 }, 125),    // 이득 쪽
+  foe(2.0, 20, 440, 60, 4),
+  gate(3.3, { x: 20, w: 200, p: -4 }, { x: 240, w: 220, p: 7 }, 350),    // 이득 쪽
+  foe(4.6, 300, 160, 60, 5),
+  gate(5.9, { x: 20, w: 230, p: 8 }, { x: 270, w: 190, p: -5 }, 135),    // 이득 쪽
+  foe(7.2, 20, 440, 70, 6),
+  gate(8.5, { x: 20, w: 190, p: -5 }, { x: 230, w: 230, p: 7 }, 345),    // 이득 쪽
+  foe(9.8, 20, 440, 70, 7),
+  gate(11.1, { x: 20, w: 220, p: 9 }, { x: 260, w: 200, p: -5 }, 130),   // 이득 쪽
+  foe(12.4, 20, 440, 80, 8),
+  gate(13.7, { x: 20, w: 200, p: 10 }, { x: 240, w: 220, p: -8 }, 350),  // ← 손해 쪽: 자동 조종의 첫 오판
+  foe(15.0, 40, 180, 60, 5),
+  gate(16.3, { x: 20, w: 230, p: -8 }, { x: 270, w: 190, p: 10 }, 135),  // ← 손해 쪽
+  gate(17.6, { x: 20, w: 210, p: 10 }, { x: 250, w: 210, p: -8 }, 125),  // 이득 쪽 (계속 틀리지는 않는다)
+  foe(18.9, 260, 200, 60, 4),
+  gate(20.2, { x: 20, w: 200, p: 10 }, { x: 240, w: 220, p: -8 }, 350),  // ← 손해 쪽
+  gate(21.5, { x: 20, w: 220, p: -8 }, { x: 260, w: 200, p: 10 }, 360),  // 이득 쪽
+  foe(22.8, 20, 440, 70, 6),
+  gate(24.1, { x: 20, w: 210, p: 10 }, { x: 250, w: 210, p: -8 }, 125),  // 이득 쪽
+  gate(25.4, { x: 20, w: 230, p: -8 }, { x: 270, w: 190, p: 10 }, 135),  // ← 손해 쪽: 큰 적 직전에 파워가 모자라진다
+  foe(26.2, 20, 440, 100, 24),                                           // ← 실패 지점: 파워가 모자란다
+  /* 여기부터는 개입 조건에서만 실제로 지나가는 구간이다 */
+  gate(28.0, { x: 20, w: 200, p: 10 }, { x: 240, w: 220, p: -8 }),
+  foe(29.3, 20, 440, 80, 14),
+  gate(30.6, { x: 20, w: 220, p: -8 }, { x: 260, w: 200, p: 11 }),
+  foe(31.9, 60, 200, 70, 10),
+  gate(33.2, { x: 20, w: 210, p: 11 }, { x: 250, w: 210, p: -8 }),
+  foe(34.5, 20, 440, 90, 14),
+  gate(35.8, { x: 20, w: 230, p: -8 }, { x: 270, w: 190, p: 12 }),
+  foe(37.1, 20, 440, 90, 16)
 ];
 
 /* 평행 자극(ver) — 같은 참가자가 시청·개입을 모두 겪으므로 두 번째 노출은 다른 스테이지여야 한다.
  * B 는 아직 없다. 요청되면 A 로 재생하고 LOG.VER_FALLBACK 에 1 을 남겨 데이터에서 드러나게 한다.
  * 조용히 A 를 두 번 보여 주는 것이 제일 나쁘다. */
-const TIMELINES = { A: MAIN_TIMELINE, B: null };
+const TIMELINES = { A: MAIN_TIMELINE_A, B: null };
 
 const resolveTimeline = () => {
   if (IS_TUTORIAL) return TUTORIAL_TIMELINE;
   const wanted = TIMELINES[CFG.ver];
   if (!wanted) {
     LOG.VER_FALLBACK = 1;
-    return MAIN_TIMELINE;
+    return MAIN_TIMELINE_A;
   }
   return wanted;
 };
@@ -69,8 +133,8 @@ const MicrogateExperiment = () => {
   const reqRef = useRef(null);
   const gameState = useRef({
     ship: { x: 220, y: 550, w: 40, h: 40, power: 10, isDead: false, vx: 0, vy: 0, ang: 0, av: 0 },
-    gates: [], enemies: [], stars: [], particles: [], rings: [], speed: 5, time: 0, eventIdx: 0, history: [],
-    flash: 0, slowFactor: 1, timeline: MAIN_TIMELINE,
+    gates: [], enemies: [], stars: [], particles: [], rings: [], speed: 5, time: 0, eventIdx: 0, history: [], rescueGoal: 0,
+    flash: 0, slowFactor: 1, timeline: MAIN_TIMELINE_A,
     shake: 0, resultAnim: { type: '', t: 0 }, vignette: 0, failReason: '', isEnding: false
   });
   const input = useRef({ left: false, right: false, mouseX: null });
@@ -82,7 +146,7 @@ const MicrogateExperiment = () => {
     gameState.current = {
       ship: { x: 220, y: 550, w: 40, h: 40, power: 10, isDead: false, vx: 0, vy: 0, ang: 0, av: 0 },
       gates: [], enemies: [], stars: Array.from({ length: 30 }, () => ({ x: Math.random() * 480, y: Math.random() * 720, s: 1 + Math.random() * 3 })),
-      particles: [], rings: [], speed: 5, time: 0, eventIdx: 0, history: [],
+      particles: [], rings: [], speed: 5, time: 0, eventIdx: 0, history: [], rescueGoal: 0,
       flash: 0, slowFactor: 1,
       timeline: resolveTimeline(),
       shake: 0, resultAnim: { type: '', t: 0 }, vignette: 0, failReason: '', isEnding: false
@@ -190,12 +254,11 @@ const MicrogateExperiment = () => {
     });
   };
 
-  const updateGame = useCallback(() => {
+  /* 로직 한 틱 — 항상 1/TICK_HZ 초에 해당한다. 그리기는 하지 않는다.
+   * 프레임마다 부르면 화면 주사율에 따라 자극 길이가 달라지므로 절대 그렇게 부르지 말 것. */
+  const stepGame = useCallback(() => {
     const state = gameState.current;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const { width, height } = canvas;
+    const width = CANVAS_W, height = CANVAS_H;
 
     if (state.eventIdx < state.timeline.length && state.time >= state.timeline[state.eventIdx].t) {
       const ev = state.timeline[state.eventIdx];
@@ -235,7 +298,7 @@ const MicrogateExperiment = () => {
         if (IS_INTERVENE) {
           // 되감기용 되돌림 기록. watch 는 되감지 않으므로 쌓지 않는다.
           state.history.push({ ship: { ...state.ship }, gates: state.gates.map(g => ({ ...g })), enemies: state.enemies.map(e => ({ ...e })), time: state.time, eventIdx: state.eventIdx });
-          if (state.history.length > 800) state.history.shift();
+          if (state.history.length > sec(REWIND_SEC)) state.history.shift();
         }
         const imminentEnemy = state.enemies.find(e => !e.dead && e.y + e.h > state.ship.y - 80 && e.y < state.ship.y + state.ship.h);
         if (imminentEnemy && state.ship.power < imminentEnemy.hp) {
@@ -253,6 +316,7 @@ const MicrogateExperiment = () => {
       checkCollisions(state, (reason) => {
         state.ship.isDead = true; state.ship.vx = (Math.random() - 0.5) * 15; state.ship.vy = (Math.random() * 5 + 5); state.ship.av = (Math.random() - 0.5) * 0.4;
         state.flash = 0.8; state.shake = 35; state.vignette = 1.0; state.failReason = reason;
+        LOG.FAIL_REASON = reason;   // 마지막 실패 사유 — watch 는 각본된 실패, intervene 은 구출 실패
         spawnParticles(state.ship.x + state.ship.w / 2, state.ship.y + state.ship.h / 2, 35, '#ffcc33', 12, 4);
         spawnParticles(state.ship.x + state.ship.w / 2, state.ship.y + state.ship.h / 2, 25, '#ff3366', 8, 6);
 
@@ -273,22 +337,46 @@ const MicrogateExperiment = () => {
           }
         }, 800);
       });
-      if (state.time > 450 && IS_TUTORIAL) endStimulus('tutorial_done');
-      if (state.time > 1250 && gamePhase === 'rewind_rescue') endStimulus('rescue_success');
+      if (IS_TUTORIAL && state.time > sec(TUTORIAL_SEC)) endStimulus('tutorial_done');
+      // 구출 성공은 되감긴 지점 기준 상대 시간이다. 절대 시각으로 두면 자동 재생 길이를
+      // 바꾸는 순간 구출 구간이 늘거나 사라진다.
+      if (gamePhase === 'rewind_rescue' && state.rescueGoal && state.time >= state.rescueGoal) {
+        endStimulus('rescue_success');
+      }
     } else if (gamePhase === 'rewind_back') {
-      if (state.history.length > 0 && state.time > 480) {
-        for (let i = 0; i < 15; i++) { if (state.history.length > 0) { const p = state.history.pop(); Object.assign(state, p); } }
+      if (state.history.length > 0 && state.time > sec(REWIND_FLOOR_SEC)) {
+        for (let i = 0; i < REWIND_SPEED; i++) { if (state.history.length > 0) { const p = state.history.pop(); Object.assign(state, p); } }
       } else if (!marks.current.interveneStart) {
         /* setGamePhase 는 비동기라 다음 렌더까지 이 분기가 몇 프레임 더 돌 수 있다.
          * 기준 시각을 덮어쓰지 않도록 진입을 한 번으로 막는다. */
-        marks.current.interveneStart = Date.now();   // 개입 구간 진입 — DWELL_INT 의 기준점
+        state.rescueGoal = state.time + sec(RESCUE_SEC);   // 여기서부터 RESCUE_SEC 을 버티면 성공
+        marks.current.interveneStart = Date.now();         // 개입 구간 진입 — DWELL_INT 의 기준점
         setGamePhase('rewind_rescue');
       }
     }
 
-    // --- Rendering ---
+    // 시각 효과 감쇠도 틱에 묶는다 — 그리는 쪽에 두면 주사율에 따라 지속 시간이 달라진다
+    if (state.shake > 0) state.shake *= 0.85;
+    if (state.flash > 0) state.flash -= 0.04;
+    if (state.vignette !== 0 && (gamePhase !== 'ended' || gameResult === 'success')) {
+      state.vignette *= 0.97;
+      if (Math.abs(state.vignette) < 0.01) state.vignette = 0;
+    }
+    if (state.resultAnim.type && state.resultAnim.t > 0) {
+      state.resultAnim.t -= state.resultAnim.type !== 'FAILURE' ? 0.004 : 0.01;
+    }
+  }, [gamePhase, gameResult, endStimulus]);
+
+  /* 그리기 — 상태를 바꾸지 않는다. 프레임마다 한 번 부른다. */
+  const renderGame = useCallback(() => {
+    const state = gameState.current;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const { width, height } = canvas;
+
     ctx.save();
-    if (state.shake > 0) { ctx.translate((Math.random() - 0.5) * state.shake, (Math.random() - 0.5) * state.shake); state.shake *= 0.85; }
+    if (state.shake > 0) ctx.translate((Math.random() - 0.5) * state.shake, (Math.random() - 0.5) * state.shake);
     ctx.fillStyle = '#050a10'; ctx.fillRect(0, 0, width, height);
     let gridAlpha = state.shake > 10 ? 0.35 : 0.05;
     if (gameResult === 'success' && gamePhase === 'ended') gridAlpha = 0.25;
@@ -344,13 +432,12 @@ const MicrogateExperiment = () => {
     state.rings.forEach(r => { ctx.globalAlpha = r.life; ctx.strokeStyle = r.color || '#ffffff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2); ctx.stroke(); });
     ctx.globalAlpha = 1.0; ctx.restore();
 
-    if (state.flash > 0) { const flashColor = gameResult === 'success' ? '200, 255, 255' : '255, 255, 255'; ctx.fillStyle = `rgba(${flashColor}, ${state.flash})`; ctx.fillRect(0, 0, width, height); state.flash -= 0.04; }
+    if (state.flash > 0) { const flashColor = gameResult === 'success' ? '200, 255, 255' : '255, 255, 255'; ctx.fillStyle = `rgba(${flashColor}, ${state.flash})`; ctx.fillRect(0, 0, width, height); }
     if (state.vignette !== 0) {
       const grad = ctx.createRadialGradient(width / 2, height / 2, width * 0.05, width / 2, height / 2, width * 0.95);
       if (state.vignette > 0) { grad.addColorStop(0, 'rgba(0, 0, 0, 0)'); grad.addColorStop(1, `rgba(100, 0, 10, ${state.vignette * 0.85})`); }
       else { grad.addColorStop(0, `rgba(0, 255, 255, ${Math.abs(state.vignette) * 0.3})`); grad.addColorStop(1, 'rgba(0, 0, 0, 0)'); }
       ctx.fillStyle = grad; ctx.fillRect(0, 0, width, height);
-      if (gamePhase !== 'ended' || gameResult === 'success') { state.vignette *= 0.97; if (Math.abs(state.vignette) < 0.01) state.vignette = 0; }
     }
 
     if (state.resultAnim.type) {
@@ -364,7 +451,7 @@ const MicrogateExperiment = () => {
         if (isSuccess) { ctx.font = 'bold 22px monospace'; ctx.fillStyle = '#00ffff'; ctx.fillText('▶ 결과를 성공적으로 바꿨습니다', 0, 145); }
         else { ctx.font = '18px monospace'; ctx.fillStyle = '#94a3b8'; ctx.fillText('더 나은 선택이 가능했습니다', 0, 145); }
       }
-      ctx.restore(); if (s.t > 0) s.t -= isSuccess ? 0.004 : 0.01;
+      ctx.restore();
     }
 
     if (gamePhase === 'rewind_watch' || gamePhase === 'rewind_back') {
@@ -378,14 +465,32 @@ const MicrogateExperiment = () => {
   /* 진행 상태를 밖으로 노출한다 — 테스트 하네스가 화면을 볼 수 없으므로 이 값으로 단계를 읽는다.
    * 세탁 자극이 window.AD_ENGINE 을 노출하는 것과 같은 목적이다. */
   useEffect(() => { window.AD_PHASE = gamePhase; }, [gamePhase]);
+  useEffect(() => { window.AD_STATE = gameState.current; }, [stage]);
 
+  /* 재생 루프 — 로직은 실제 경과 시간만큼 고정 간격으로 돌리고, 그리기는 프레임마다 한 번.
+   * 프레임마다 로직을 한 번씩 돌리면 120Hz 화면에서 자극이 2배 빨리 끝난다. 참가자 기기에
+   * 따라 노출 시간이 달라지면 안 되므로 여기서 주사율을 떼어 낸다. */
   useEffect(() => {
-    if (stage === STAGES.PLAY) {
-      const loop = () => { if (gamePhase !== 'ended' || gameResult === 'success') updateGame(); reqRef.current = requestAnimationFrame(loop); };
+    if (stage !== STAGES.PLAY) return;
+    let acc = 0;
+    let last = 0;
+    const loop = (now) => {
       reqRef.current = requestAnimationFrame(loop);
-      return () => cancelAnimationFrame(reqRef.current);
-    }
-  }, [stage, gamePhase, updateGame, gameResult]);
+      if (!last) { last = now; renderGame(); return; }
+      const dt = Math.min(now - last, MAX_FRAME_MS);   // 탭 복귀 등으로 크게 밀린 구간은 버린다
+      last = now;
+
+      if (gamePhase !== 'ended' || gameResult === 'success') {
+        acc += dt;
+        let steps = 0;
+        while (acc >= TICK_MS && steps < MAX_CATCHUP_STEPS) { acc -= TICK_MS; stepGame(); steps++; }
+        if (steps >= MAX_CATCHUP_STEPS) acc = 0;       // 따라잡기를 포기하고 현재 시점에 맞춘다
+      }
+      renderGame();
+    };
+    reqRef.current = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(reqRef.current);
+  }, [stage, gamePhase, gameResult, stepGame, renderGame]);
 
   useEffect(() => {
     if (stage !== STAGES.PLAY || gamePhase === 'autoplay_fail_watch' || gamePhase === 'ended') return;

@@ -81,6 +81,27 @@ function bootPage(query, bundle) {
   return window;
 }
 
+const CANVAS_W = 480;
+
+/** 주의를 기울이는 참가자 — 파워가 큰 상자를 고르고, 못 이기는 적은 빈 쪽으로 피한다 */
+function attentive(st) {
+  const ship = st.ship;
+  const foe = st.enemies.find(e => !e.dead && e.y + e.h > ship.y - 320 && e.y < ship.y + ship.h);
+  if (foe && ship.power < foe.hp) {
+    const leftGap = foe.x;
+    const rightGap = CANVAS_W - (foe.x + foe.w);
+    if (leftGap >= rightGap && leftGap > 70) return leftGap / 2;
+    if (rightGap > 70) return foe.x + foe.w + rightGap / 2;
+  }
+  const gates = st.gates.filter(g => !g.passed && g.y < ship.y).sort((a, b) => b.y - a.y);
+  if (gates.length) {
+    const g = gates[0];
+    const best = g.p1 >= g.p2 ? { x: g.x1, w: g.w1 } : { x: g.x2, w: g.w2 };
+    return best.x + best.w / 2;
+  }
+  return ship.x + ship.w / 2;
+}
+
 /** 개입 구간에서 참가자 조작을 흉내낸다 — 캔버스 좌표 x 로 기체를 옮긴다 */
 function movePointer(window, x) {
   window.dispatchEvent(new window.MouseEvent('mousemove', {
@@ -107,4 +128,4 @@ function suite(name) {
   };
 }
 
-module.exports = { APP_DIR, build, bootPage, movePointer, wait, suite };
+module.exports = { APP_DIR, CANVAS_W, build, bootPage, movePointer, attentive, wait, suite };
