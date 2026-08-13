@@ -19,9 +19,20 @@ const STAGES = {
   ENDED: 'ended'    // 종료 통지 후 러너가 화면을 걷어갈 때까지의 대기 화면
 };
 
-/* 캔버스 좌표계 — 로직은 이 크기 안에서만 계산한다(화면 크기와 무관) */
+/* 캔버스 좌표계 — 로직은 이 크기 안에서만 계산한다(화면 크기와 무관).
+ *
+ * 480×853 은 9:16 이다(480 × 16/9 = 853.3). 세탁 자극과 러너의 자극 틀이 9:16 이라
+ * 여기에 맞춰야 두 자극이 화면에서 같은 크기를 차지한다. 예전 720(2:3)일 때는
+ * 위아래에 검은 띠가 남아 게임만 틀의 84% 만 채웠다.
+ *
+ * 높이를 늘려도 **게임 진행은 하나도 바뀌지 않는다.** 배의 y 는 550 고정이고,
+ * 게이트·적은 y=-120 에서 생겨 배까지 늘 670px 를 이동한다 — 즉 사건이 일어나는 시각도,
+ * 참가자가 반응할 시간도 그대로다. 늘어난 133px 는 전부 배 **아래쪽** 빈 우주다.
+ * height 를 쓰는 곳은 배경·격자·중앙 문구·별 순환뿐이다.
+ *
+ * 그래서 CANVAS_W 는 절대 못 바꾼다 — 타임라인의 게이트 x·w 가 전부 이 폭 기준이다. */
 const CANVAS_W = 480;
-const CANVAS_H = 720;
+const CANVAS_H = 853;
 
 /* 로직 틱 — 타임라인의 t 단위가 곧 이 틱이다. 60틱 = 1초.
  * 화면 주사율이 얼마든 1초에 TICK_HZ 번만 돈다. */
@@ -195,7 +206,7 @@ const MicrogateExperiment = () => {
   const initGame = () => {
     gameState.current = {
       ship: { x: 220, y: 550, w: 40, h: 40, power: 10, isDead: false, vx: 0, vy: 0, ang: 0, av: 0 },
-      gates: [], enemies: [], stars: Array.from({ length: 30 }, () => ({ x: Math.random() * 480, y: Math.random() * 720, s: 1 + Math.random() * 3 })),
+      gates: [], enemies: [], stars: Array.from({ length: 30 }, () => ({ x: Math.random() * CANVAS_W, y: Math.random() * CANVAS_H, s: 1 + Math.random() * 3 })),
       particles: [], rings: [], speed: 5, time: 0, eventIdx: 0, history: [], rescueGoal: 0,
       flash: 0, slowFactor: 1,
       timeline: resolveTimeline(),
@@ -574,7 +585,7 @@ const MicrogateExperiment = () => {
           {IS_TUTORIAL && (
             <div className="tutorial-overlay" style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.7)', padding: '10px 20px', borderRadius: '20px', zIndex: 10, pointerEvents: 'none', width: 'auto', textAlign: 'center', color: '#00ffcc', border: '1px solid #00ffcc' }}>마우스/드래그로 좌우로 이동하여 파워를 높이세요!</div>
           )}
-          <canvas ref={canvasRef} width="480" height="720" className="game-canvas"></canvas>
+          <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H} className="game-canvas"></canvas>
         </div>
       )}
 
