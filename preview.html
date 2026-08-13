@@ -8,11 +8,11 @@
   preview.html — 자극과 설문을 실험 순서대로 이어 보기 위한 러너.
 
   아직 통합 러너(session.html)가 아니다. 없는 것:
-    - 동의서·디브리핑 화면
     - 로그를 파일이 아니라 수집 서버로 보내기
     - laundry-ad 의 localStorage 키를 'ad_log_'+sid+'_'+stim+'_'+mode 로 맞추기 (INTEGRATION.md §2)
 
-  들어 있는 것: 시작 안내 → 사전 문항 3 → (안내 → 자극 → 설문 29 → 휴식) × 4 → 기본 정보 2 → 종료.
+  들어 있는 것: 시작 안내 → 동의서 → 사전 문항 3 → 조작 연습 →
+                (안내 → 자극 → 설문 29 → 휴식) × 4 → 기본 정보 2 → 디브리핑 → 종료.
   설문 문항과 참가자에게 보이는 문구는 survey.js 하나에서만 온다 — 고치려면 그쪽을 고친다.
 
   기본값은 참가자 화면이다. ?dev=1 을 붙여야 연구원용(블록 순서표·미리보기 설정·수집 결과
@@ -150,6 +150,28 @@
   .sidbox label { display: block; font-size: 14px; margin-bottom: 8px; }
   .sidbox input[type=text] { font-size: 16px; padding: 12px 14px; width: 100%; max-width: 260px; }
   .sidbox .dim { margin: 8px 0 0; }
+
+  /* ---------- 동의서·디브리핑 ----------
+     읽으라고 내놓는 글이라 설문 문항보다 줄 간격을 넓히고 글자를 키웠다.
+     체크 상자는 손가락으로 누를 자리를 상자 전체로 잡는다 — 네모 하나만 누르게 하면
+     자꾸 빗나가고, 빗나간 참가자는 동의를 안 한 것으로 남는다. */
+  .doc h3 { font-size: 16px; margin: 24px 0 7px; }
+  .doc h3:first-child { margin-top: 6px; }
+  .doc p { margin: 0 0 9px; font-size: 15.5px; line-height: 1.72; color: #333a46; }
+  .agree { border-top: 1px solid var(--line); margin-top: 26px; padding-top: 20px;
+           display: flex; flex-direction: column; gap: 10px; }
+  .agree label {
+    display: flex; gap: 11px; align-items: flex-start; font-size: 15.5px;
+    padding: 13px 15px; border: 1.5px solid var(--line); border-radius: 10px;
+    background: #fff; cursor: pointer; min-height: 48px;
+  }
+  .agree label.on { border-color: var(--accent); background: var(--accent-soft); }
+  .agree input { margin: 3px 0 0; flex: none; }
+  /* 거절은 동의와 나란히 두지 않는다 — 나란히 두면 오른쪽 큰 버튼을 습관적으로 누른다 */
+  .decline { margin-top: 18px; text-align: center; }
+  .decline button { font-size: 14.5px; padding: 10px 18px; }
+  button:disabled { background: #b9c2d0; cursor: not-allowed; }
+  button:disabled:hover { background: #b9c2d0; }
   /* ---------- 조작 연습 ----------
      도형만 쓴다. 광고에 나오는 물건·화면을 쓰면 광고를 미리 보여 주는 셈이 된다. */
   .pr-say { font-size: 17px; font-weight: 600; margin: 18px 0 12px; }
@@ -294,7 +316,8 @@ var state = {
   withPractice: qs.get('practice') !== '0',   // 연습 건너뛰기 — 미리보기 전용
   lenient: qs.get('lenient') === '1',   // 미응답 허용 — 미리보기 전용
   group: 0, seq: [], flow: [], step: 0, saved: false, saveError: null,
-  resp: { pre: {}, demo: {}, blocks: {}, attention: {} },
+  declined: false,                      // 동의서에서 참여를 거절함 — 여기서 흐름이 끝난다
+  resp: { pre: {}, demo: {}, blocks: {}, attention: {}, consent: null, debrief: {} },
   practice: null,
   logs: [],
   playing: false
@@ -343,9 +366,13 @@ function buildSeq() {
   });
 }
 
-/** 화면 목록 — 사전 → 연습 → (안내 → 자극 → 설문 6쪽 → 휴식) × 4 → 기본 정보 → 종료 */
+/** 화면 목록 — 동의서 → 사전 → 연습 → (안내 → 자극 → 설문 6쪽 → 휴식) × 4
+ *  → 기본 정보 → 디브리핑 → 종료
+ *
+ *  동의서는 맨 앞이다. 사전 문항이라도 동의 전에 받으면 그건 동의 없이 받은 자료다.
+ *  디브리핑은 마지막 문항 뒤다. 앞에 두면 목적을 알고 답한 자료가 되어 쓸 수 없다. */
 function buildFlow() {
-  var f = [{ kind: 'pre' }];
+  var f = [{ kind: 'consent' }, { kind: 'pre' }];
   if (state.withPractice) f.push({ kind: 'practice' });
   var last = realBlocks().length;
   state.seq.forEach(function (b) {
@@ -362,6 +389,7 @@ function buildFlow() {
     if (b.block < last) f.push({ kind: 'break', b: b });
   });
   f.push({ kind: 'demo' });
+  f.push({ kind: 'debrief' });
   f.push({ kind: 'end' });
   return f;
 }
@@ -517,6 +545,8 @@ function progressPct() {
 /* 진행 표시 — 123문항의 부담을 줄이는 최소 장치다. 어디까지 왔는지만 말하고
  * 자극 이름·조건은 넣지 않는다. */
 function crumbFor(s) {
+  if (s.kind === 'consent') return '연구 참여 동의';
+  if (s.kind === 'debrief') return '연구에 대한 설명';
   if (s.kind === 'pre') return '사전 문항';
   if (s.kind === 'demo') return '기본 정보';
   if (s.kind === 'break') return '휴식';
@@ -552,8 +582,9 @@ function showStart(warning) {
         '<h2 class="dim">연구원 화면 — 참가자에게 보이지 않습니다</h2>' +
         '<p class="dim">화면 판 <span class="mono">' + BUILD + '</span> · ' +
           '사전 문항 ' + S.PRE.length + '개 · 총 ' + S.TOTAL_ITEMS + '문항</p>' +
-        '<p class="dim">미리보기 러너입니다. 통합 러너(session.html)가 아니므로 ' +
-          '순서 배정·동의서·디브리핑은 들어 있지 않습니다.</p>' +
+        '<p class="dim">미리보기 러너입니다. 동의서·디브리핑은 들어 있고, ' +
+          '통합 러너(session.html)가 아니므로 수집 서버 전송은 아직 없습니다 — ' +
+          '자료는 이 브라우저에만 쌓입니다.</p>' +
         (errs.length ? '<p class="note">설문 문항 점검 — ' + errs.map(esc).join(' / ') + '</p>' : '') +
         '<p class="dim">식별 번호 <span class="mono">' + esc(state.sid) + '</span> → ' +
           '<b>' + state.group + '집단</b> ' +
@@ -607,10 +638,11 @@ function showStart(warning) {
     state.sid = document.getElementById('sid').value.trim() || state.sid;
     state.group = groupOf(state.sid);       // 식별 번호가 바뀌면 순서도 바뀐다
     state.seq = buildSeq();
-    state.resp = { pre: {}, demo: {}, blocks: {}, attention: {} };
+    state.resp = { pre: {}, demo: {}, blocks: {}, attention: {}, consent: null, debrief: {} };
     state.practice = null;
     state.saved = false;
     state.saveError = null;
+    state.declined = false;
     state.logs = [];
     state.flow = buildFlow();
     state.step = 0;
@@ -627,8 +659,11 @@ function collectionBox() {
       '이 브라우저에 자동으로 쌓입니다.</p></div>';
   }
   var rows = runs.map(function (r, i) {
+    /* 자료 사용을 거절한 참여는 눈에 띄어야 한다 — 응답이 없는 줄인 줄 모르고
+     * 결측으로 오해하면 안 된다. 참여자 수에는 세지만 분석에는 못 쓴다. */
+    var gone = r.bundle && r.bundle.withdrawn;
     return '<tr><td>' + (i + 1) + '</td>' +
-      '<td class="mono">' + esc(r.sid) + '</td>' +
+      '<td class="mono">' + esc(r.sid) + (gone ? ' <span class="dim">· 자료 사용 거절</span>' : '') + '</td>' +
       '<td>' + r.group + '집단</td>' +
       '<td class="dim">' + esc(String(r.at).replace('T', ' ').slice(0, 16)) + '</td>' +
       '<td><button class="ghost mini" data-csv="' + i + '">CSV</button> ' +
@@ -690,11 +725,118 @@ function render() {
   if (s.kind === 'play') return play(s);
   if (s.kind === 'break') return showBreak(s);
   if (s.kind === 'practice') return showPractice(s);
+  if (s.kind === 'consent') return showConsent(s);
+  if (s.kind === 'debrief') return showDebrief(s);
   if (s.kind === 'end') return showEnd();
   if (s.kind === 'pre')  return showItemPage(s, S.PRE, 'pre', state.resp.pre, S.PRE_INSTRUCTION, 1);
   if (s.kind === 'demo') return showItemPage(s, S.DEMO, 'demo', state.resp.demo, S.DEMO_INSTRUCTION, 1);
   if (s.kind === 'intro') return showIntro(s);
   return showSurvey(s);
+}
+
+/** 동의서·디브리핑 본문 — {h, p[]} 목록을 그대로 그린다 */
+function docSections(sections) {
+  return '<div class="doc">' + sections.map(function (sec) {
+    return '<h3>' + esc(sec.h) + '</h3>' +
+      sec.p.map(function (t) { return '<p>' + esc(t) + '</p>'; }).join('');
+  }).join('') + '</div>';
+}
+
+/* 연구 참여 동의서.
+ *
+ * '다음' 버튼은 세 항목에 모두 체크하기 전까지 눌리지 않는다. 미응답 문항처럼 빨갛게
+ * 표시했다가 통과시키는 방식(state.lenient)을 여기에는 쓰지 않는다 — 설문 문항은 빠져도
+ * 결측 하나지만, 동의는 빠지면 동의 없이 받은 자료가 된다.
+ *
+ * 거절 단추를 실제로 두는 이유: 거절할 자리가 화면에 없으면 그만두는 방법이 "연구원을
+ * 불러 세우는 것"뿐이고, 그건 자발적 참여가 아니라 눈치의 문제가 된다. */
+function showConsent(s) {
+  var C = S.CONSENT;
+  var checks = C.checks.map(function (c) {
+    return '<label data-check="' + c.id + '"><input type="checkbox" id="ck_' + c.id + '">' +
+      '<span>' + esc(c.label) + '</span></label>';
+  }).join('');
+
+  var body = '<div class="card">' +
+      '<h1>' + esc(C.title) + '</h1>' +
+      '<p class="lead">' + esc(C.lead) + '</p>' +
+      docSections(C.sections) +
+      '<div class="agree">' + checks + '</div>' +
+      '<div class="decline"><button class="ghost" id="decline">' + esc(C.decline) + '</button></div>' +
+    '</div>';
+
+  root.innerHTML = chrome(crumbFor(s), progressPct(), body, '', C.agree);
+
+  var btn = document.getElementById('next');
+  var count = document.getElementById('count');
+  var boxes = C.checks.map(function (c) { return document.getElementById('ck_' + c.id); });
+
+  function update() {
+    var all = boxes.every(function (b) { return b.checked; });
+    btn.disabled = !all;
+    count.textContent = all ? '' : C.pending;
+    boxes.forEach(function (b) {
+      b.closest('[data-check]').classList.toggle('on', b.checked);
+    });
+  }
+  boxes.forEach(function (b) { b.onchange = update; });
+  update();
+
+  btn.onclick = function () {
+    if (btn.disabled) return;
+    /* 무엇에 언제 동의했는지를 항목별로 남긴다. 한 칸에 1 만 남기면 나중에
+     * "연령 확인은 받았나"를 자료로 답할 수 없다. */
+    state.resp.consent = { at: Date.now(), agreed: 1 };
+    C.checks.forEach(function (c) { state.resp.consent[c.id] = 1; });
+    state.step++;
+    render();
+  };
+  document.getElementById('decline').onclick = function () { showDeclined(); };
+}
+
+/** 동의하지 않음 — 여기서 끝난다. 아무것도 저장하지 않는다 */
+function showDeclined() {
+  state.declined = true;
+  root.innerHTML = '<div class="wrap"><div class="card center">' +
+      '<h1>' + esc(S.CONSENT.declinedTitle) + '</h1>' +
+      '<p class="task">' + esc(S.CONSENT.declinedText) + '</p>' +
+    '</div></div>';
+}
+
+/* 디브리핑 — 동의서에서 미뤄 둔 설명을 갚는 자리.
+ *
+ * 마지막 문항 뒤, 종료 화면 앞이다. 자료 사용 재동의는 여기서 받는다. 설명을 읽기 전에
+ * 물으면 "목적을 알고 난 뒤의 판단"이 아니라서 물어본 의미가 없다. */
+function showDebrief(s) {
+  var D = S.DEBRIEF, q = S.DEBRIEF_WITHDRAW;
+  var body = '<div class="card">' +
+      '<h1>' + esc(D.title) + '</h1>' +
+      '<p class="lead">' + esc(D.lead) + '</p>' +
+      docSections(D.sections) +
+    '</div>' +
+    '<div class="card">' +
+      renderItem(q, '', 'debrief', state.resp.debrief[q.id]) +
+    '</div>';
+
+  root.innerHTML = chrome(crumbFor(s), progressPct(), body, '', '제출');
+  /* 문항이 하나뿐이라 "0 / 1 응답" 세는 것은 소음이다. 미응답 표시만 지워 준다 */
+  document.querySelectorAll('.wrap input[type=radio]').forEach(function (r) {
+    r.addEventListener('change', function () {
+      var host = r.closest('[data-item]');
+      if (host) host.classList.remove('miss');
+    });
+  });
+  bindNext(function () {
+    /* 이 문항은 lenient 로도 건너뛰지 못한다 — 안 고른 것을 "써도 좋다"로 읽으면 안 된다 */
+    if (unanswered('debrief', [q]).length) return markMissing([q.id]), false;
+    collect('debrief', [q], state.resp.debrief);
+    return true;
+  });
+}
+
+/** 참가자가 디브리핑에서 자료 사용에 동의하지 않았는가 */
+function withdrew() {
+  return Number(state.resp.debrief[S.DEBRIEF_WITHDRAW.id]) === S.WITHDRAW_VALUE;
 }
 
 /** 사전 문항·기본 정보 — 선택지형 한 쪽 */
@@ -834,19 +976,20 @@ function showEnd() {
   escapeBtn.hidden = true;
   frame.src = 'about:blank';
 
-  var bundle = exportBundle();
+  var gone = withdrew();
+  var bundle = gone ? withdrawnBundle() : exportBundle();
+  var row = gone ? withdrawnRow()[0] : flatRow()[0];
   var json = JSON.stringify(bundle, null, 1);
 
   /* 한 번만 저장한다 — 화면이 다시 그려져도 같은 응답이 두 줄로 쌓이면 안 된다 */
   if (!state.saved) {
     state.saved = true;
-    state.saveError = saveRun(bundle, flatRow()[0]);
+    state.saveError = saveRun(bundle, row);
   }
 
   /* 원자료 덤프와 응답 확인 통과 여부는 연구원 화면에만 둔다.
    * 응답 확인이 주의 점검이었다는 사실이 참가자에게 드러나면 다음 참가자에게 새어 나가고,
-   * 그 문항은 기능을 잃는다.
-   * 응답 확인이 주의 점검이었다는 사실이 참가자에게 드러나면 다음 참가자에게 새어 나간다. */
+   * 그 문항은 기능을 잃는다. */
   var devPanel = !state.dev ? '' :
       '<div class="devbox"><div class="hd">연구원 — 수집 결과</div>' +
         '<p class="dim">sid <span class="mono">' + esc(state.sid) + '</span> · ' +
@@ -867,8 +1010,10 @@ function showEnd() {
 
   root.innerHTML = chrome('종료', 100,
     '<div class="card' + (state.dev ? '' : ' center') + '">' +
-      '<p class="task">' + esc(S.CLOSING) + '</p>' +
+      '<p class="task">' + esc(gone ? S.WITHDRAW_ACK : S.CLOSING) + '</p>' +
       (state.saveError ? '<p class="note">' + esc(state.saveError) + '</p>' : '') +
+      (gone && state.dev ? '<p class="note">자료 사용 거절 — 응답은 저장하지 않았습니다. ' +
+        '수집함에는 참여 사실과 거절 표시만 남습니다.</p>' : '') +
       devPanel +
       saveRow +
     '</div>', '', '');
@@ -878,7 +1023,7 @@ function showEnd() {
     download(fileStem() + '.json', json, 'application/json');
   };
   document.getElementById('csv').onclick = function () {
-    download(fileStem() + '.csv', toCsv(flatRow()), 'text/csv');
+    download(fileStem() + '.csv', toCsv([row]), 'text/csv');
   };
   if (state.dev) document.getElementById('again').onclick = function () { showStart(); };
 }
@@ -934,6 +1079,22 @@ window.addEventListener('message', function (e) {
  * 7. 내보내기
  * ========================================================== */
 
+/* 자료 사용을 거절한 참가자 — 동의서에서 "사용하지 않고 폐기한다"고 약속했으므로
+ * 응답을 내보내지도, 저장하지도 않는다. 대신 참여가 있었다는 사실과 거절했다는 사실만
+ * 남긴다. 이것마저 지우면 연구원이 "몇 명이 왔고 몇 명이 빠졌는지"를 셀 수 없고,
+ * 그 숫자는 논문에 반드시 적어야 하는 것이다. */
+function withdrawnBundle() {
+  return {
+    sid: state.sid, group: state.group, withdrawn: 1,
+    consent: state.resp.consent,
+    note: '참가자가 디브리핑 후 자료 사용에 동의하지 않아 응답을 저장하지 않았다'
+  };
+}
+
+function withdrawnRow() {
+  return [{ sid: state.sid, 집단: state.group, 자료사용거절: 1 }];
+}
+
 function exportBundle() {
   var subs = {};
   Object.keys(state.resp.blocks).forEach(function (k) {
@@ -946,6 +1107,9 @@ function exportBundle() {
     sid: state.sid,
     group: state.group,
     order: realBlocks().map(function (b) { return blockKey(b) + ':' + b.ver; }),
+    withdrawn: 0,
+    consent: state.resp.consent,
+    debrief: state.resp.debrief,
     pre: state.resp.pre,
     practice: state.practice,
     blocks: state.resp.blocks,
@@ -959,6 +1123,12 @@ function exportBundle() {
 /** 분석용 1행(wide) — 열 이름은 <자극>_<조건>_<문항id> */
 function flatRow() {
   var r = { sid: state.sid, 집단: state.group, order: realBlocks().map(blockKey).join('>') };
+  r['자료사용거절'] = 0;
+  /* 동의 기록 — 항목별로 남긴다. 동의 시각은 초 단위까지만(분석에 쓸 값이 아니라 기록이다) */
+  var cs = state.resp.consent || {};
+  r['동의_시각'] = cs.at ? new Date(cs.at).toISOString().slice(0, 19).replace('T', ' ') : null;
+  S.CONSENT.checks.forEach(function (c) { r[c.id] = cs[c.id] || null; });
+  r[S.DEBRIEF_WITHDRAW.id] = state.resp.debrief[S.DEBRIEF_WITHDRAW.id];
   Object.keys(state.resp.pre).forEach(function (k) { r[k] = state.resp.pre[k]; });
   // 연습 기록 — 조작을 못 익힌 참가자를 나중에 가려낼 수 있게 남긴다
   Object.keys(state.practice || {}).forEach(function (k) { r[k] = state.practice[k]; });
