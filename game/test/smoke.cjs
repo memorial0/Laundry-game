@@ -17,9 +17,9 @@ const CAP = 180000;          // 안전 상한(ms)
 const RESCUE_THINK = 700;    // 개입 구간 진입 후 첫 조작까지의 지연(ms) — 참가자 반응 흉내
 
 const CONDITIONS = [
-  { mode: 'watch', ver: 'A' },
-  { mode: 'intervene', ver: 'A' },
-  { mode: 'tutorial', ver: 'A' }
+  { mode: 'watch' },
+  { mode: 'intervene' },
+  { mode: 'tutorial' }
 ];
 const name = c => c.mode;
 
@@ -135,7 +135,12 @@ function reportAsymmetry(t, results) {
 }
 
 module.exports = async function (argv) {
-  const only = (argv && argv.length) ? argv : null;
+  const args = (argv || []).slice();
+  const verArg = args.filter(a => /^(ver=)?[AB]$/.test(a)).pop();
+  const ver = verArg ? verArg.replace('ver=', '') : 'A';
+  CONDITIONS.forEach(c => { c.ver = ver; });
+  const rest = args.filter(a => !/^(ver=)?[AB]$/.test(a));
+  const only = rest.length ? rest : null;
   const list = only ? CONDITIONS.filter(c => only.some(a => name(c).indexOf(a) >= 0)) : CONDITIONS;
   if (!list.length) {
     console.error('그런 조건이 없습니다: ' + only.join(' ') +
@@ -143,7 +148,7 @@ module.exports = async function (argv) {
     process.exit(2);
   }
 
-  const t = suite('게임 자극 실행 점검');
+  const t = suite('게임 자극 실행 점검 (ver ' + ver + ')');
   t.section('번들 빌드 중…');
   const bundle = build();
 

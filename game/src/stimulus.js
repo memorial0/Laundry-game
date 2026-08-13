@@ -75,7 +75,7 @@ export var LOG = {
   COLLISION_T: null,      // 초, 자극 시작~자동재생 충돌
   POWER_END: null,
   GATES_PASSED: 0,
-  VER_FALLBACK: 0         // ver=B 를 요청했지만 B 타임라인이 없어 A로 대체됨
+  VER_FALLBACK: 0         // 요청한 ver 의 타임라인이 없어 A로 대체됨 (A·B 가 다 있는 지금은 늘 0)
 };
 
 window.AD_RESULT = LOG;

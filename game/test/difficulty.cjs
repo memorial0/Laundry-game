@@ -22,6 +22,7 @@ const { build, bootPage, movePointer, attentive, wait, suite, CANVAS_W } = requi
 const POLL = 40;             // 조작 판단 간격(ms)
 const REACT_MS = 600;        // 개입 구간 진입 후 첫 조작까지 (참가자 반응 흉내)
 const CAP = 120000;
+let VER = 'A';
 
 /* 게이트마다 확률 p 로만 이득 상자를 고른다 — 100%(attentive)와 0%(idle) 사이가
  * 어디쯤인지 보려는 것이다. 선택 기록은 **판마다 독립**이어야 한다. 모듈 수준에 두면
@@ -52,7 +53,7 @@ const POLICIES = {
 /** 개입 조건 한 판 */
 async function playOnce(policy, run, bundle) {
   const sid = 'diff-' + policy + '-' + run;
-  const w = bootPage('?mode=intervene&ver=A&sid=' + sid + '&block=1', bundle);
+  const w = bootPage('?mode=intervene&ver=' + VER + '&sid=' + sid + '&block=1', bundle);
   const t0 = Date.now();
   let rescueAt = 0;
   let tick = 0;
@@ -88,8 +89,11 @@ function summarize(t, policy, results) {
 }
 
 module.exports = async function (argv) {
-  const runs = Math.max(1, parseInt((argv && argv[0]) || '3', 10));
-  const t = suite('개입 구간 난이도 (성공률)');
+  const args = (argv || []).slice();
+  const verArg = args.filter(a => /^(ver=)?[AB]$/.test(a)).pop();
+  VER = verArg ? verArg.replace('ver=', '') : 'A';
+  const runs = Math.max(1, parseInt(args.filter(a => /^\d+$/.test(a))[0] || '3', 10));
+  const t = suite('개입 구간 난이도 (ver ' + VER + ', 성공률)');
   t.section('번들 빌드 중…');
   const bundle = build();
   t.section(runs + '회 × 4정책을 동시에 재생합니다 — 약 ' + Math.ceil(runs * 60 / 60) + '분 걸립니다');

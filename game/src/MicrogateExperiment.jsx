@@ -109,10 +109,60 @@ const MAIN_TIMELINE_A = [
   foe(37.1, 20, 440, 90, 16)
 ];
 
-/* 평행 자극(ver) — 같은 참가자가 시청·개입을 모두 겪으므로 두 번째 노출은 다른 스테이지여야 한다.
- * B 는 아직 없다. 요청되면 A 로 재생하고 LOG.VER_FALLBACK 에 1 을 남겨 데이터에서 드러나게 한다.
- * 조용히 A 를 두 번 보여 주는 것이 제일 나쁘다. */
-const TIMELINES = { A: MAIN_TIMELINE_A, B: null };
+/* ver B — A 의 평행 자극.
+ *
+ * 같은 것: 사건 수(게이트 16 · 적 13), 각 사건의 시각, 이득/손해 값, 적 HP,
+ *          자동 조종이 오판하는 지점(13.7 · 16.3 · 20.2 · 25.4), 실패 지점(26.2초).
+ * 다른 것: 이득 상자가 나오는 좌우 패턴과 적의 좌우 위치.
+ *
+ * 즉 참가자가 겪는 난이도와 노출 시간은 같고, 눈에 보이는 배치만 다르다.
+ * 같은 참가자가 시청·개입을 모두 겪는 설계라서, 두 번째 노출을 기억으로 되풀이할 수 없어야 한다.
+ * A 를 좌우로 뒤집기만 하면 금방 알아채므로 이득 쪽 순서 자체를 다르게 뒀다.
+ * 좌우 패턴에는 두 가지 제약이 걸린다.
+ *  - 전부 뒤집으면 정확한 거울상이라 "아까 그거 뒤집은 것"으로 읽힌다 → 일부는 A 와 같은 쪽에 둔다.
+ *  - 같은 쪽이 세 번 이상 이어지면 한자리에 가만히 있는 배가 그 줄을 그대로 타고 가
+ *    무조작으로도 구출에 성공한다(실제로 그랬다) → 같은 쪽 연속은 최대 2회로 제한한다.
+ *   A: 좌우 좌우 좌 좌우 좌좌 우 좌우 좌우 좌우
+ *   B: 우좌 우좌 우 좌좌 우우 좌 좌우 우좌 우좌
+ */
+const MAIN_TIMELINE_B = [
+  gate(0.7, { x: 20, w: 210, p: -4 }, { x: 250, w: 210, p: 8 }, 355),    // 이득 쪽
+  foe(2.0, 20, 440, 60, 4),
+  gate(3.3, { x: 20, w: 220, p: 7 }, { x: 260, w: 200, p: -4 }, 130),    // 이득 쪽
+  foe(4.6, 20, 160, 60, 5),
+  gate(5.9, { x: 20, w: 220, p: -5 }, { x: 260, w: 200, p: 8 }, 360),    // 이득 쪽
+  foe(7.2, 20, 440, 70, 6),
+  gate(8.5, { x: 20, w: 230, p: 7 }, { x: 270, w: 190, p: -5 }, 135),    // 이득 쪽
+  foe(9.8, 20, 440, 70, 7),
+  gate(11.1, { x: 20, w: 200, p: -5 }, { x: 240, w: 220, p: 9 }, 350),   // 이득 쪽
+  foe(12.4, 20, 440, 80, 8),
+  gate(13.7, { x: 20, w: 200, p: 10 }, { x: 240, w: 220, p: -8 }, 350),  // ← 손해 쪽: 자동 조종의 첫 오판
+  foe(15.0, 260, 180, 60, 5),
+  gate(16.3, { x: 20, w: 210, p: 10 }, { x: 250, w: 210, p: -8 }, 355),  // ← 손해 쪽
+  gate(17.6, { x: 20, w: 210, p: -8 }, { x: 250, w: 210, p: 10 }, 355),  // 이득 쪽 (계속 틀리지는 않는다)
+  foe(18.9, 20, 200, 60, 4),
+  gate(20.2, { x: 20, w: 220, p: -8 }, { x: 260, w: 200, p: 10 }, 130),  // ← 손해 쪽
+  gate(21.5, { x: 20, w: 200, p: 10 }, { x: 240, w: 220, p: -8 }, 120),  // 이득 쪽
+  foe(22.8, 20, 440, 70, 6),
+  gate(24.1, { x: 20, w: 230, p: 10 }, { x: 270, w: 190, p: -8 }, 135),  // 이득 쪽
+  gate(25.4, { x: 20, w: 190, p: -8 }, { x: 230, w: 230, p: 10 }, 115),  // ← 손해 쪽: 큰 적 직전에 파워가 모자라진다
+  foe(26.2, 20, 440, 100, 24),                                           // ← 실패 지점: 파워가 모자란다
+  /* 여기부터는 개입 조건에서만 실제로 지나가는 구간이다 */
+  gate(28.0, { x: 20, w: 200, p: -8 }, { x: 240, w: 220, p: 10 }),
+  foe(29.3, 20, 440, 80, 14),
+  gate(30.6, { x: 20, w: 220, p: 11 }, { x: 260, w: 200, p: -8 }),
+  foe(31.9, 220, 200, 70, 10),
+  gate(33.2, { x: 20, w: 210, p: -8 }, { x: 250, w: 210, p: 11 }),
+  foe(34.5, 20, 440, 90, 14),
+  gate(35.8, { x: 20, w: 230, p: 12 }, { x: 270, w: 190, p: -8 }),
+  foe(37.1, 20, 440, 90, 16)
+];
+
+const TIMELINES = { A: MAIN_TIMELINE_A, B: MAIN_TIMELINE_B };
+
+/* 평행성 검사(test/parallel.cjs)가 두 버전을 뜯어볼 수 있도록 내보낸다.
+ * 자극 동작에는 쓰이지 않는다 — 세탁 자극이 window.AD_ART 를 노출하는 것과 같은 목적이다. */
+if (typeof window !== 'undefined') window.AD_TIMELINES = TIMELINES;
 
 const resolveTimeline = () => {
   if (IS_TUTORIAL) return TUTORIAL_TIMELINE;
@@ -191,7 +241,9 @@ const MicrogateExperiment = () => {
     const success = result === 'rescue_success' || result === 'tutorial_done';
 
     if (success) {
-      state.resultAnim = { type: result === 'rescue_success' ? '개입 성공' : '연습 완료', t: 1.0 };
+      /* 조건 이름을 화면에 쓰지 않는다 — '개입'은 이 연구가 비교하는 형식의 이름이다.
+       * 결과만 말하고, 무엇을 조작한 연구인지는 디브리핑에서 고지한다. */
+      state.resultAnim = { type: result === 'rescue_success' ? '성공' : '연습 완료', t: 1.0 };
       state.vignette = -2.5; state.flash = 1.0; state.shake = 12;
       state.ship.vy = -18; state.ship.vx = 0;
       spawnParticles(state.ship.x + state.ship.w / 2, state.ship.y + state.ship.h / 2, 100, '#00ffff', 18, 6);
@@ -201,7 +253,7 @@ const MicrogateExperiment = () => {
         }, i * 100);
       }
       if (result === 'rescue_success') {
-        state.failReason = '직접 개입해 결과를 바꿨습니다!';
+        state.failReason = '결과가 달라졌습니다!';
         setTimeout(() => { spawnParticles(state.ship.x + state.ship.w / 2, state.ship.y + state.ship.h / 2, 150, '#ffffff', 25, 4); state.flash = 1.0; state.shake = 25; state.vignette = -3.0; }, 300);
       } else {
         state.failReason = '조작을 익혔습니다';
@@ -516,7 +568,7 @@ const MicrogateExperiment = () => {
           {CFG.debug && (
             <p className="dbg-line dbg-overlay">
               sid={CFG.sid} · mode={CFG.mode} · ver={CFG.ver} · block={String(CFG.block)} · {gamePhase}
-              {LOG.VER_FALLBACK ? ' · ⚠ ver=B 없음 → A 재생' : ''}
+              {LOG.VER_FALLBACK ? ' · ⚠ 해당 ver 타임라인 없음 → A 재생' : ''}
             </p>
           )}
           {IS_TUTORIAL && (
