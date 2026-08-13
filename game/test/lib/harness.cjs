@@ -71,8 +71,12 @@ function bootPage(query, bundle) {
     if (!this.__ctx) { this.__ctx = stubContext(); this.__ctx.canvas = this; }
     return this.__ctx;
   };
+  // 실제 브라우저에서는 캔버스가 화면 크기에 맞춰 늘어나지만, 여기서는 원래 크기 그대로
+  // 놓인 것으로 둔다. 포인터 좌표 환산에 쓰이는 것은 width 뿐이고, 그 값이 캔버스 해상도와
+  // 같으면 환산 배율이 1 이 되어 조작 좌표를 게임 좌표로 그대로 읽을 수 있다.
   window.HTMLCanvasElement.prototype.getBoundingClientRect = function () {
-    return { left: 0, top: 0, width: 480, height: 720, right: 480, bottom: 720, x: 0, y: 0 };
+    return { left: 0, top: 0, width: CANVAS_W, height: CANVAS_H,
+             right: CANVAS_W, bottom: CANVAS_H, x: 0, y: 0 };
   };
 
   const s = window.document.createElement('script');
@@ -81,7 +85,10 @@ function bootPage(query, bundle) {
   return window;
 }
 
+/* 캔버스 좌표계 — MicrogateExperiment.jsx 의 CANVAS_W/CANVAS_H 와 같아야 한다.
+ * 폭은 게이트·적의 x 가 이 값 기준이라 조작 정책이 직접 쓴다. */
 const CANVAS_W = 480;
+const CANVAS_H = 853;
 
 /** 주의를 기울이는 참가자 — 파워가 큰 상자를 고르고, 못 이기는 적은 빈 쪽으로 피한다 */
 function attentive(st) {
