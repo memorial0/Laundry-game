@@ -888,8 +888,10 @@
       },
       // 자막도 같은 어간을 공유하고 "수행 주체"를 나타내는 끝맺음만 다르다
       subtitle: function () {
-        return '시트 한 장을 세탁기 안에 ' +
-          (CFG.mode === MODES.INTERVENE ? '넣어 주세요' : '넣기만 하면');
+        /* "넣어 주세요"는 눌러서 넣으라는 말로도 읽힌다. 실제 조작은 드래그 하나뿐이므로
+         * 동작을 그대로 말한다 — 조작을 몰라 못 하는 것은 조건이 아니라 잡음이다. */
+        return '시트를 세탁기 안으로 끌어다 ' +
+          (CFG.mode === MODES.INTERVENE ? '놓아 주세요' : '놓기만 하면');
       },
       render: function (ctx) {
         var el = ART.svg(ART.s6({ still: CFG.still !== null }), 'sc6');
