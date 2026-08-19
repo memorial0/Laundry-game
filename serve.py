@@ -22,6 +22,14 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
         self.send_header('Expires', '0')
         super().end_headers()
 
+    def translate_path(self, path):
+        # 배포에서는 build.mjs 가 preview.html 을 dist/index.html 로도 복사해서 '/' 가 러너를
+        # 연다. 로컬만 디렉터리 목록이 뜨면 참가자가 볼 화면과 다른 것을 보며 확인하게 되므로
+        # 여기서도 '/' 를 러너로 보낸다.
+        if path.split('?', 1)[0].split('#', 1)[0] in ('/', '/index.html'):
+            path = '/preview.html'
+        return super().translate_path(path)
+
     def log_message(self, fmt, *args):
         # 404 만 남긴다 — 200 까지 찍으면 흐름이 로그에 묻힌다
         if args and str(args[1]) != '200':
@@ -30,6 +38,6 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
 
 if __name__ == '__main__':
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
-    print('http://localhost:%d/preview.html  (참가자 화면)' % port)
-    print('http://localhost:%d/preview.html?dev=1  (연구원 화면)' % port)
+    print('http://localhost:%d/  (참가자 화면 — 배포와 같은 주소)' % port)
+    print('http://localhost:%d/?dev=1  (연구원 화면)' % port)
     ThreadingHTTPServer(('', port), NoCacheHandler).serve_forever()
