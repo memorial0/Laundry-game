@@ -10,11 +10,12 @@
  */
 'use strict';
 
-const { build, bootPage, movePointer, attentive, wait, suite } = require('./lib/harness.cjs');
+const { build, bootPage, movePointer, attentive, clickRewind, wait, suite } = require('./lib/harness.cjs');
 
 const POLL = 50;
 const CAP = 180000;          // 안전 상한(ms)
 const RESCUE_THINK = 700;    // 개입 구간 진입 후 첫 조작까지의 지연(ms) — 참가자 반응 흉내
+const REWIND_THINK = 900;    // 실패 화면에서 [되돌리기]를 누르기까지의 지연(ms)
 
 const CONDITIONS = [
   { mode: 'watch' },
@@ -40,12 +41,20 @@ async function play(cond, bundle) {
   const t0 = Date.now();
   const marks = [];            // {phase, at}
   let rescueAt = 0;
+  let rewindAt = 0;
   let end = 0;
 
   while (Date.now() - t0 < CAP) {
     const phase = w.AD_PHASE;
     const last = marks[marks.length - 1];
     if (phase && (!last || last.phase !== phase)) marks.push({ phase, at: Date.now() });
+
+    /* 실패 화면에서 [되돌리기]를 누른다 — 안 누르면 여기서 영원히 기다린다.
+     * 참가자 반응 시간을 흉내내 REWIND_THINK 만큼 두고 누른다(T_REWIND 가 0 이 아니게 된다). */
+    if (phase === 'rewind_watch') {
+      if (!rewindAt) rewindAt = Date.now();
+      if (Date.now() - rewindAt > REWIND_THINK) clickRewind(w);
+    }
 
     // 참가자가 조작해야 하는 구간에서만 포인터를 움직인다
     if (phase === 'rewind_rescue' || phase === 'tutorial_play') {
@@ -109,7 +118,12 @@ function report(t, r) {
     t.ok(typeof log.T_FIRST_DRAG === 'number',
       'T_FIRST_DRAG(첫 조작까지) 기록', log.T_FIRST_DRAG);
     t.ok(typeof log.COLLISION_T === 'number', 'COLLISION_T(실패 시점) 기록', log.COLLISION_T);
+    /* 되감기는 참가자가 [되돌리기]를 눌러야 시작한다. 이 값이 없으면 되감기가 저절로
+     * 일어났다는 뜻이고, 그러면 "내가 고치기로 했다"는 첫 결정이 사라진 것이다. */
+    t.ok(typeof log.T_REWIND === 'number' && log.T_REWIND > 0,
+      'T_REWIND(되돌리기를 누르기까지) 기록', log.T_REWIND);
   } else if (cond.mode === 'watch') {
+    t.ok(log.T_REWIND === null, '시청형은 되돌리기가 없어 T_REWIND = null', log.T_REWIND);
     t.ok(log.DWELL_INT === null && log.INT_DONE === null &&
       log.T_FIRST_DRAG === null && log.T_MANIP === null,
       '시청형은 개입 필드가 전부 null',
@@ -117,7 +131,21 @@ function report(t, r) {
     t.ok(log.RESULT === 'scripted_fail', '시청형 결과는 scripted_fail', log.RESULT);
   }
 
-  t.ok(log.CTA_CLICK === null, '게임에는 CTA 가 없어 null', log.CTA_CLICK);
+  /* 튜토리얼은 광고가 아니라 조작 연습이라 제품 카드를 띄우지 않는다.
+   * 광고 두 조건은 카드가 뜨고, 이 하네스는 CTA 를 누르지 않으므로 0 이어야 한다. */
+  if (cond.mode === 'tutorial') {
+    t.ok(seen.indexOf('product_card') < 0, '튜토리얼에는 제품 카드가 없다', seen.join(' → '));
+  } else {
+    t.ok(seen.indexOf('product_card') >= 0, '제품 메시지 + CTA 카드를 지난다', seen.join(' → '));
+  }
+  t.ok(log.CTA_CLICK === 0, 'CTA 미클릭은 0 으로 기록 (null 아님)', log.CTA_CLICK);
+
+  /* 소리 — jsdom 에는 AudioContext 가 없어 실제로는 울리지 않는다.
+   * 여기서 보는 것은 "몇 번 울렸어야 하는가"가 로그에 남고, 소리 코드가 자극을
+   * 멈추지 않는다는 것이다. 규격이 세탁 자극과 같은지는 laundry-ad 의 sfx 검사가 본다. */
+  t.ok(log.SFX_COUNT > 0, '효과음 신호 수가 기록됐다', log.SFX_COUNT);
+  t.ok(log.AUDIO_OK === null, '오디오 장치가 없으면 AUDIO_OK = null (0 아님)', log.AUDIO_OK);
+
   t.info('RESULT', log.RESULT);
   t.info('GATES_PASSED / POWER_END', [log.GATES_PASSED, log.POWER_END]);
   if (log.VER_FALLBACK) t.info('⚠ ver=' + cond.ver + ' 타임라인이 없어 A 로 재생됨', log.VER_FALLBACK);

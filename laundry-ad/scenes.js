@@ -45,6 +45,19 @@
   // 시트가 투입구 안으로 사라지는 프레임(약 66%) 직후.
   var DOOR_CLOSE_AT = 0.6625;
 
+  /* 효과음 — sfx.js 가 먼저 로드돼 window.AD_SFX 를 만들어 둔다.
+   * 없더라도(스크립트 누락·구형 브라우저) 자극은 그대로 돌아가야 하므로 무음 대역을 둔다.
+   * 게임 자극도 같은 이름의 신호를 같은 길이·세기로 낸다 — game/src/sfx.js 참고. */
+  var Sfx = window.AD_SFX || {
+    unlock: function () { return false; },
+    play: function () { return false; },
+    startBed: function () { return false; },
+    stopBed: function () {},
+    state: function () { return 'none'; },
+    audioOk: function () { return null; },
+    fired: 0, played: 0, bedOn: false
+  };
+
   /* OS "동작 줄이기" 설정 — 자극은 이 값에 따라 달라지지 않는다(속도·입자 수 고정).
    * 참가자 간 자극 동일성을 위해 로그에만 남긴다. */
   function readsReducedMotion() {
@@ -719,7 +732,13 @@
         };
         el.classList.add('is-watch');
         el.style.setProperty('--s6-watch-dur', S.WATCH_MS + 'ms');
-        later(function () { el.classList.add('is-closed'); }, S.WATCH_MS * DOOR_CLOSE_AT);
+        /* 시연에도 개입과 같은 신호를 같은 순서로 낸다 — 집는 소리, 투입되는 소리.
+         * 수행 주체만 다르고 들리는 것은 같아야 한다. */
+        Sfx.play('grab');
+        later(function () {
+          el.classList.add('is-closed');
+          Sfx.play('beat');
+        }, S.WATCH_MS * DOOR_CLOSE_AT);
         return;
       }
 
@@ -778,6 +797,7 @@
         if (!firstDownAt) {                  // 드래그 시작까지 걸린 시간(초)
           firstDownAt = performance.now();
           ctx.log.T_FIRST_DRAG = round2((firstDownAt - enteredAt) / 1000);
+          Sfx.play('grab');                  // 첫 조작 — 게임 자극의 첫 조작음과 같은 자리다
         }
         var u = toUser(ev);
         grab.x = u.x - pos.x;
@@ -809,6 +829,7 @@
       /* 오답: 비난 문구 없이 원위치로 스냅백 */
       function snapBack() {
         ctx.log.INT_ATTEMPTS++;
+        Sfx.play('miss');                    // 비난 문구가 없으니 소리도 나무라지 않는 짧은 신호다
         pos.x = S.HOME.x; pos.y = S.HOME.y;
         sheet.style.transition = 'transform 340ms cubic-bezier(.2,.9,.3,1.1)';
         place(pos.x, pos.y);
@@ -826,7 +847,10 @@
         sheet.style.transition = 'transform 420ms cubic-bezier(.4,0,.2,1), opacity 260ms 200ms linear';
         place(S.DROP.x, S.DROP.y, ' scale(.22)');
         sheet.style.opacity = '0';
-        later(function () { el.classList.add('is-closed'); }, 440);
+        later(function () {
+          el.classList.add('is-closed');
+          Sfx.play('beat');                  // 투입 완료 — 성공음(success)은 개선 결과 장면 몫이다
+        }, 440);
         later(function () { ctx.engine.next(); }, 1150);
       }
 
@@ -855,6 +879,7 @@
       no: 2,
       title: '제품 미사용',
       dur: 5,
+      sfx: 'beat',
       subtitle: function () { return '그대로 세탁 시작'; },
       render: function () { return ART.svg(ART.s2({ still: CFG.still !== null }), 'sc2'); }
     },
@@ -862,6 +887,7 @@
       no: 3,
       title: '실패 진행',
       dur: 6,
+      sfx: 'bad',
       subtitle: function () { return '세탁 중…'; },
       render: function () { return ART.svg(ART.s3({ still: CFG.still !== null }), 'sc3'); }
     },
@@ -869,15 +895,52 @@
       no: 4,
       title: '실패 결과',
       dur: 7,
+      sfx: 'fail',
       subtitle: function () { return V.light.name + ' 색이 변해 버렸다'; },
       render: function () { return ART.svg(ART.s4({ still: CFG.still !== null }), 'sc4'); }
     },
     {
       no: 5,
       title: '되감기',
-      dur: 6,
+      /* 되감기는 저절로 시작하지 않는다 — 참가자가 [되돌리기]를 눌러야 한다.
+       * 그래서 이 장면은 길이가 정해져 있지 않다(누르기까지 대기 + 누른 뒤 6초).
+       *
+       * 예전에는 6초 뒤 광고가 알아서 되감았다. 그러면 되돌리는 주체가 광고이고
+       * 참가자는 구경꾼이다. 실패-수정형 광고에서 재려는 것이 "내가 고쳤다"는
+       * 경험이므로, 고치기로 하는 첫 결정도 참가자가 내려야 한다.
+       * 게임 자극도 같은 자리에 같은 버튼이 있다(INTEGRATION.md §11). */
+      dur: null,
+      /* 되감기음은 장면 진입이 아니라 **버튼을 누른 순간** 울린다 — 아래 start() 참고 */
+      sfx: null,
       subtitle: function () { return '세탁을 시작하기 전에, 이 제품을 사용했다면?'; },
-      render: function () { return ART.svg(ART.s5({ still: CFG.still !== null }), 'sc5'); }
+      render: function (ctx) {
+        var el = ART.svg(ART.s5({ still: CFG.still !== null }), 'sc5',
+          '<div class="rewind-prompt">' +
+          '<p class="rw-msg">지금 이 세탁을 되돌린다면?</p>' +
+          '<button type="button" class="rewind-btn">되돌리기</button>' +
+          '</div>');
+        // 스토리보드 캡처(?still=5)는 대기 없이 되감기 화면 그대로를 보여 준다
+        if (CFG.still !== null) return el;
+
+        el.classList.add('is-hold');     // 되감기 애니메이션을 첫 프레임에 세워 둔다
+        var shownAt = performance.now();
+        var started = false;
+        var timer = null;
+
+        function start() {
+          if (started) return;           // 두 번 눌러도 한 번만 먹는다
+          started = true;
+          ctx.log.T_REWIND = round2((performance.now() - shownAt) / 1000);
+          el.classList.remove('is-hold');
+          el.classList.add('is-rewinding');
+          Sfx.play('rewind');            // 게임 자극의 되감기와 같은 자리다
+          timer = setTimeout(function () { ctx.engine.next(); }, 6000);
+        }
+
+        el.querySelector('.rewind-btn').addEventListener('click', start);
+        el.__cleanup = function () { if (timer) clearTimeout(timer); };
+        return el;
+      }
     },
     {
       no: 6,
@@ -903,6 +966,7 @@
       no: 7,
       title: '제품 작동',
       dur: 6,
+      sfx: 'beat',
       subtitle: function () { return '떠다니는 염료를 시트가 붙잡아요'; },
       render: function () { return ART.svg(ART.s7({ still: CFG.still !== null }), 'sc7'); }
     },
@@ -910,6 +974,7 @@
       no: 8,
       title: '개선 결과',
       dur: 6,
+      sfx: 'success',
       subtitle: function () { return '색은 그대로'; },
       render: function () { return ART.svg(ART.s8({ still: CFG.still !== null }), 'sc8'); }
     },
@@ -917,6 +982,7 @@
       no: 9,
       title: '결과 비교',
       dur: 6,
+      sfx: 'beat',
       subtitle: function () { return '시트 하나의 차이'; },
       render: function () { return ART.svg(ART.s9(), 'sc9'); }
     },
@@ -924,6 +990,7 @@
       no: 10,
       title: '제품 메시지 + CTA',
       dur: 8,
+      sfx: 'card',
       subtitle: function () { return '세탁 중 이염을 줄여 밝은 옷을 보호하세요'; },
       render: function (ctx) {
         var el = ART.svg(
@@ -937,6 +1004,9 @@
           btn.disabled = true;             // 모의 광고 — 외부 이동 없음
           btn.classList.add('is-pressed');
           ctx.log.CTA_CLICK = 1;
+          /* 종료(=로그 스냅숏) 전에 울려야 SFX_COUNT 에 이 클릭이 포함된다.
+           * 이 클릭음은 게임 자극과 음색까지 같다 — sfx.js 의 CTA_VOICE. */
+          Sfx.play('cta');
           ctx.engine.finish({ endAt: clickedAt }); // DWELL_TOTAL은 클릭 시점까지
         });
         return el;
@@ -986,9 +1056,19 @@
     INT_ATTEMPTS: 0,                               // 목표 밖 드롭(스냅백) 횟수
     T_FIRST_DRAG: null,                            // 초, 장면 6 진입~첫 드래그 시작. watch/미조작은 null
     T_MANIP: null,                                 // 초, 첫 드래그~성공(미완료면 장면 이탈까지). watch는 null
+    /* 초, 장면 5에서 [되돌리기]가 뜬 뒤 실제로 누르기까지.
+     * 예전에는 광고가 알아서 되감았다. 참가자가 누르게 바꾸면서 생긴 값이고,
+     * 개입 조건의 재생 길이가 참가자마다 달라지는 원인이기도 하다.
+     * watch에는 장면 5가 없으므로 null. 게임 자극도 같은 이름으로 기록한다. */
+    T_REWIND: null,
     HINT_SHOWN: 0,                                 // 힌트 노출 횟수
     CTA_CLICK: 0,
     REDUCED_MOTION: readsReducedMotion(),          // OS 동작 줄이기 설정. 자극에는 영향 없음(기록 전용)
+    /* 소리가 실제로 났는지 1/0, 해당 없음(sound=0·장치 없음)이면 null.
+     * 자동재생 정책에 막히면 그 참가자만 무음으로 본 것이라, 이 값을 안 남기면
+     * 분석에서 소리를 통제했다고 말할 수 없다. 게임 자극도 같은 이름으로 기록한다. */
+    AUDIO_OK: null,
+    SFX_COUNT: 0,                                  // 낸 신호 수(들렸는지와 무관) — 자극 간 청각 밀도 비교용
     scene_times: {},                               // 장면별 체류(초)
     scene_enter: {}                                // 장면별 최초 진입 시각(epoch ms)
   };
@@ -1021,9 +1101,13 @@
         INT_ATTEMPTS: LOG.INT_ATTEMPTS,
         T_FIRST_DRAG: LOG.T_FIRST_DRAG,
         T_MANIP: LOG.T_MANIP,
+        T_REWIND: LOG.T_REWIND,
         HINT_SHOWN: LOG.HINT_SHOWN,
         CTA_CLICK: LOG.CTA_CLICK,
         REDUCED_MOTION: LOG.REDUCED_MOTION,
+        // 스냅숏을 뜨는 시점의 실제 상태를 읽는다 — 재생 도중 잠금이 풀릴 수 있다
+        AUDIO_OK: Sfx.audioOk(),
+        SFX_COUNT: Sfx.fired,
         scene_times: st,
         scene_enter: byNo(LOG.scene_enter)
       };
@@ -1087,6 +1171,10 @@
     start: function () {
       LOG.t_start = Date.now();
       this.playing = true;
+      Sfx.play('start');
+      /* 배경음 — 잠금이 아직 안 풀렸으면 풀리는 순간 알아서 켜진다.
+       * ?still=N 정지 화면은 재생이 아니므로 여기 안 온다. */
+      Sfx.startBed();
       this.goto(0);
     },
 
@@ -1120,6 +1208,10 @@
       this.current = el;
 
       this.setSubtitle(scene.subtitle());
+
+      /* 장면 진입음. 정지 화면(?still)에서는 울리지 않는다 — 스토리보드 캡처용이라
+       * 참가자가 보는 재생이 아니다. 장면 1 은 start 가 이미 울렸으므로 비워 둔다. */
+      if (CFG.still === null && scene.sfx) Sfx.play(scene.sfx);
 
       this.sceneEnteredAt = performance.now();
       this.remaining = scene.dur === null ? Infinity : scene.dur * 1000;
@@ -1198,6 +1290,7 @@
       LOG.INT_ATTEMPTS = 0;
       LOG.T_FIRST_DRAG = null;
       LOG.T_MANIP = null;
+      LOG.T_REWIND = null;
       LOG.HINT_SHOWN = 0;
       LOG.CTA_CLICK = 0;
       delete document.documentElement.dataset.state;
@@ -1229,6 +1322,7 @@
       this.playing = false;
       LOG.t_end = o.endAt || Date.now();
       LOG.DWELL_TOTAL = round2((LOG.t_end - LOG.t_start) / 1000);
+      Sfx.stopBed();   // 잦아들며 꺼진다 — 아래 로그 마감은 이걸 기다리지 않는다
       document.documentElement.dataset.state = 'ended';
       Log.done();
       Debug.sync();

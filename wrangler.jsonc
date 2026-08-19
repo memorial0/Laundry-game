@@ -6,9 +6,39 @@
   //
   // name 은 이미 쓰고 있는 주소와 같아야 한다. 바꾸면 새 주소가 생기고
   // laundry-game.npcsun2.workers.dev 는 옛 판을 그대로 내보낸다.
+  //
+  // ── 빌드 ──────────────────────────────────────────────────────────
+  //
+  // 아래 build.command 는 wrangler 가 올리기 직전에 스스로 돌린다.
+  // dist/ 는 저장소에 없고(.gitignore) build.mjs 가 만드는 것이라, 빌드를
+  // 건너뛰면 올릴 폴더 자체가 없어서 이렇게 멈춘다:
+  //
+  //   The directory specified by the "--assets" command line argument
+  //   does not exist: /opt/buildhome/repo/dist
+  //
+  // 이 줄을 설정 파일에 둔 이유: Cloudflare 대시보드의 Build command 는
+  // 배포마다 그때의 값이 찍혀 저장된다. 그래서 Build command 가 비어 있던
+  // 시절의 배포를 나중에 "재시도" 하면, 대시보드를 고쳤든 말든 그 옛 설정으로
+  // 다시 돌아 똑같이 실패한다. 빌드가 저장소 안에 있으면 그 경로가 막힌다.
+  //
+  // ── Cloudflare 대시보드 (Workers & Pages → laundry-game → Settings → Build) ──
+  //
+  //   Build command   : (비움 — 위 build.command 가 대신한다)
+  //   Deploy command  : npx wrangler deploy
+  //   Version command : npx wrangler versions upload
+  //   Root directory  : /
+  //
+  // Deploy command 는 프로덕션 브랜치(main)에서 돈다. 여기에 versions upload 를
+  // 넣으면 판만 쌓이고 laundry-game.npcsun2.workers.dev 는 옛 판에 멈춘 채로
+  // 남는다 — main 에 병합해도 참가자가 보는 화면이 안 바뀐다.
+  // Version command 는 그 외 브랜치용이고, versions upload 가 맞다.
+  //
+  // 두 명령 모두 --assets 를 붙일 필요가 없다. 아래 assets.directory 가
+  // 이미 같은 것을 가리킨다.
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "laundry-game",
   "compatibility_date": "2026-08-13",
+  "build": { "command": "npm run build" },
   "assets": {
     "directory": "./dist",
 

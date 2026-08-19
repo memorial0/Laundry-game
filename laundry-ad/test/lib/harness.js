@@ -13,10 +13,15 @@ const { JSDOM } = require('jsdom');
 const APP_DIR = path.resolve(__dirname, '../..');
 const HTML = fs.readFileSync(path.join(APP_DIR, 'index.html'), 'utf8');
 const JS = fs.readFileSync(path.join(APP_DIR, 'scenes.js'), 'utf8');
+const SFX = fs.readFileSync(path.join(APP_DIR, 'sfx.js'), 'utf8');
+
+/* jsdom 은 외부 <script src> 를 가져오지 않는다. 태그를 지우고 아래에서 직접 주입한다.
+ * 순서는 실제 페이지와 같아야 한다 — sfx.js 가 먼저다. */
+const STRIP = /<script src="(sfx|scenes)\.js"><\/script>/g;
 
 /** 실제 페이지를 띄운다. window.__messages 에 postMessage 수신분이 쌓인다. */
 function bootPage(query) {
-  const dom = new JSDOM(HTML.replace('<script src="scenes.js"></script>', ''), {
+  const dom = new JSDOM(HTML.replace(STRIP, ''), {
     url: 'http://localhost/' + (query || ''),
     pretendToBeVisual: true,
     runScripts: 'dangerously'
@@ -27,9 +32,13 @@ function bootPage(query) {
   window.addEventListener('error', e => window.__errors.push(e.error));
   window.addEventListener('message', e => window.__messages.push(e.data));
 
-  const s = window.document.createElement('script');
-  s.textContent = JS;
-  window.document.body.appendChild(s);
+  /* jsdom 에는 AudioContext 가 없다 — sfx.js 는 무음으로 떨어지고 AUDIO_OK 는 null 이 된다.
+   * 여기서 검사하는 것은 "소리가 나느냐"가 아니라 "소리 코드가 자극을 멈추지 않느냐"다. */
+  [SFX, JS].forEach(src => {
+    const s = window.document.createElement('script');
+    s.textContent = src;
+    window.document.body.appendChild(s);
+  });
   return window;
 }
 

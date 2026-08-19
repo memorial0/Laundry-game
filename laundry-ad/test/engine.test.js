@@ -54,9 +54,14 @@ module.exports = async function () {
   }
 
   t.section('길이 · 총 재생시간');
+  /* 공란(빈 칸)은 길이가 정해져 있지 않은 장면이다.
+   *   장면 5 — 참가자가 [되돌리기]를 눌러야 되감기가 시작된다(누른 뒤 6초)
+   *   장면 6 — 시트를 넣어야 넘어간다
+   * 그래서 intervene 의 "고정 길이"는 이 둘을 뺀 값이고, 실제 재생 길이는
+   * 고정 길이 + 되돌리기 대기 + 되감기 6초 + 조작 시간이다(INTEGRATION.md §11). */
   for (const [mode, table, lo, hi] of [
     ['watch', '5,5,6,7,8', 28, 34],
-    ['intervene', '5,5,6,7,6,,6,6,6,8', 53, 58]   // 장면 6은 가변(null)이라 공란
+    ['intervene', '5,5,6,7,,,6,6,6,8', 47, 52]
   ]) {
     const w = bootPage('?mode=' + mode);
     await wait(120);
