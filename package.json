@@ -4,8 +4,8 @@
   "description": "실패-수정형 광고 실험 — 자극 두 종과 통합 러너. 이 파일은 배포용 묶음을 만드는 데만 쓴다.",
   "scripts": {
     "build": "node build.mjs",
-    "deploy": "npm run build && wrangler versions upload",
-    "deploy:production": "npm run build && wrangler deploy",
+    "deploy": "wrangler versions upload",
+    "deploy:production": "wrangler deploy",
     "serve": "python3 serve.py"
   },
   "devDependencies": {
