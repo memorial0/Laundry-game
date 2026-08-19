@@ -40,6 +40,7 @@ function stubContext() {
     canvas: null,
     save: noop, restore: noop, translate: noop, rotate: noop, scale: noop,
     beginPath: noop, closePath: noop, moveTo: noop, lineTo: noop, arc: noop,
+    quadraticCurveTo: noop, bezierCurveTo: noop, ellipse: noop,
     rect: noop, roundRect: noop, fill: noop, stroke: noop,
     fillRect: noop, strokeRect: noop, clearRect: noop, fillText: noop,
     measureText: () => ({ width: 0 }),
@@ -91,6 +92,17 @@ const CANVAS_W = 480;
 const CANVAS_H = 853;
 
 /** 주의를 기울이는 참가자 — 파워가 큰 상자를 고르고, 못 이기는 적은 빈 쪽으로 피한다 */
+/* 기뢰를 겨냥할 만한 거리 — 빔 사정거리(210)보다 앞에서 움직이기 시작해야 제때 닿는다.
+ * 게임 쪽 BEAM_REACH 를 고치면 이 값도 같이 봐야 한다. */
+const MINE_LOOKAHEAD = 300;
+
+/** 지금 겨냥해야 할 기뢰 — 없으면 null */
+function pendingMine(st) {
+  const ship = st.ship;
+  return (st.mines || []).find(m => !m.dead && !m.missed &&
+    m.y > ship.y - MINE_LOOKAHEAD && m.y < ship.y) || null;
+}
+
 function attentive(st) {
   const ship = st.ship;
   const foe = st.enemies.find(e => !e.dead && e.y + e.h > ship.y - 320 && e.y < ship.y + ship.h);
@@ -100,6 +112,10 @@ function attentive(st) {
     if (leftGap >= rightGap && leftGap > 70) return leftGap / 2;
     if (rightGap > 70) return foe.x + foe.w + rightGap / 2;
   }
+  /* 기뢰가 사정거리 안이면 먼저 겨냥한다 — 기뢰는 일부러 안전한 물길의 반대쪽에 있어서,
+   * 여기서 게이트보다 먼저 처리하지 않으면 늘 놓친다. 이게 곧 주의 분할 난이도다. */
+  const m = pendingMine(st);
+  if (m) return m.sx == null ? m.x : m.sx;
   const gates = st.gates.filter(g => !g.passed && g.y < ship.y).sort((a, b) => b.y - a.y);
   if (gates.length) {
     const g = gates[0];
@@ -107,6 +123,22 @@ function attentive(st) {
     return best.x + best.w / 2;
   }
   return ship.x + ship.w / 2;
+}
+
+/**
+ * 실패 화면의 [되돌리기]를 누른다.
+ *
+ * 실패 뒤 되감기는 저절로 일어나지 않는다 — 참가자가 눌러야 시작한다(INTEGRATION.md §11).
+ * 그래서 자동 재생 드라이버도 이 버튼을 눌러 줘야 한다. 안 누르면 rewind_watch 에서
+ * 영원히 멈추고, 그건 실제 참가자가 가만히 있을 때와 똑같은 상태다.
+ *
+ * @returns {boolean} 실제로 눌렀는지(아직 버튼이 없으면 false)
+ */
+function clickRewind(window) {
+  const btn = window.document.querySelector('.rewind-btn');
+  if (!btn) return false;
+  btn.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  return true;
 }
 
 /** 개입 구간에서 참가자 조작을 흉내낸다 — 캔버스 좌표 x 로 기체를 옮긴다 */
@@ -135,4 +167,6 @@ function suite(name) {
   };
 }
 
-module.exports = { APP_DIR, CANVAS_W, build, bootPage, movePointer, attentive, wait, suite };
+module.exports = {
+  clickRewind,
+  pendingMine, APP_DIR, CANVAS_W, build, bootPage, movePointer, attentive, wait, suite };

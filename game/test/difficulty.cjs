@@ -17,7 +17,7 @@
  */
 'use strict';
 
-const { build, bootPage, movePointer, attentive, wait, suite, CANVAS_W } = require('./lib/harness.cjs');
+const { build, bootPage, movePointer, attentive, pendingMine, clickRewind, wait, suite, CANVAS_W } = require('./lib/harness.cjs');
 
 const POLL = 40;             // 조작 판단 간격(ms)
 const REACT_MS = 600;        // 개입 구간 진입 후 첫 조작까지 (참가자 반응 흉내)
@@ -29,8 +29,16 @@ let VER = 'A';
  * 동시에 도는 판들이 같은 선택을 공유해 전부 같은 결과가 나온다. */
 function makeChooser(p) {
   const choice = {};
+  const aim = {};
   return function (st) {
     const ship = st.ship;
+    /* 기뢰도 같은 확률로 겨냥한다 — 대충 보는 참가자는 게이트도 기뢰도 대충 본다.
+     * 기뢰만 늘 맞히게 두면 정책 사이의 차이가 게이트에서만 나와 난이도가 실제보다 낮게 잡힌다. */
+    const m = pendingMine(st);
+    if (m) {
+      if (aim[m.t] === undefined) aim[m.t] = Math.random() < p;
+      if (aim[m.t]) return m.sx == null ? m.x : m.sx;
+    }
     const gates = st.gates.filter(g => !g.passed && g.y < ship.y).sort((a, b) => b.y - a.y);
     if (!gates.length) return ship.x + ship.w / 2;
     const g = gates[0];
@@ -61,6 +69,10 @@ async function playOnce(policy, run, bundle) {
   const act = POLICIES[policy]();
   while (Date.now() - t0 < CAP) {
     const phase = w.AD_PHASE;
+    /* 실패 화면의 [되돌리기] — 정책과 무관하게 누른다. 안 누르면 구출 구간에 못 들어가
+     * 네 정책이 전부 "실패"로 나와 난이도를 잴 수 없다. 여기서 재려는 것은 되돌릴지
+     * 말지가 아니라 되돌린 뒤의 조작이다. */
+    if (phase === 'rewind_watch') clickRewind(w);
     if (phase === 'rewind_rescue' && act) {
       if (!rescueAt) rescueAt = Date.now();
       if (Date.now() - rescueAt > REACT_MS && w.AD_STATE) {

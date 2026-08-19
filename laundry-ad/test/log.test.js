@@ -3,8 +3,8 @@
 const { bootPage, wait, dragSheet, suite } = require('./lib/harness');
 
 const SCHEMA = ['sid', 'mode', 'ver', 't_start', 't_end', 'DWELL_TOTAL', 'DWELL_INT',
-  'INT_DONE', 'INT_ATTEMPTS', 'T_FIRST_DRAG', 'T_MANIP', 'HINT_SHOWN', 'CTA_CLICK',
-  'REDUCED_MOTION', 'scene_times', 'scene_enter'];
+  'INT_DONE', 'INT_ATTEMPTS', 'T_FIRST_DRAG', 'T_MANIP', 'T_REWIND', 'HINT_SHOWN', 'CTA_CLICK',
+  'REDUCED_MOTION', 'AUDIO_OK', 'SFX_COUNT', 'scene_times', 'scene_enter'];
 
 const done = w => (w.__messages.find(m => m && m.type === 'AD_DONE') || {}).payload;
 

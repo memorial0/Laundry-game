@@ -328,6 +328,36 @@ var playWrap = document.getElementById('playWrap');
 var frame = document.getElementById('frame');
 var escapeBtn = document.getElementById('escape');
 
+/* ----------------------------------------------------------
+ * 자극의 소리 잠금 풀기
+ *
+ * 브라우저는 사용자 제스처 없이 소리를 내지 못하게 막는다. 그런데 자극 안에는
+ * 시작 버튼이 없고(두 자극 공통 규격), 시청 조건 참가자는 광고를 보는 동안 화면을
+ * 한 번도 건드리지 않을 수 있다 — 그러면 그 참가자만 무음으로 광고를 본다.
+ *
+ * 그래서 **러너가 대신 풀어 준다.** 참가자가 러너에서 버튼을 누르는 순간(=제스처를
+ * 들고 있는 순간) 같은 출처의 iframe 안 AudioContext 를 직접 깨운다. 자극이 아직
+ * 안 떴으면 자극이 보내는 AD_READY 를 받아 한 번 더 시도한다.
+ *
+ * 그래도 막히는 브라우저가 있을 수 있어, 실제로 소리가 났는지는 자극이 AUDIO_OK 로
+ * 기록한다. 분석에서 "소리를 들은 참가자"를 가려낼 수 있어야 하기 때문이다.
+ * ---------------------------------------------------------- */
+function unlockFrameAudio() {
+  var w = frame.contentWindow;
+  if (!w) return;
+  // 같은 출처라 직접 부를 수 있다. 이 호출이 제스처 안에서 일어나야 잠금이 풀린다.
+  try { if (w.AD_SFX && w.AD_SFX.unlock) w.AD_SFX.unlock(); } catch (e) { /* 아직 로드 전 */ }
+  try { w.postMessage({ type: 'AD_UNLOCK' }, '*'); } catch (e) { /* 프레임 없음 */ }
+}
+// 러너 위에서 일어나는 모든 제스처를 잠금 해제 기회로 쓴다(시작 버튼 클릭 포함)
+['pointerdown', 'touchstart', 'keydown'].forEach(function (t) {
+  document.addEventListener(t, unlockFrameAudio, true);
+});
+// 자극이 뜬 직후 — 앞선 클릭의 제스처가 아직 유효한 동안 다시 시도한다
+window.addEventListener('message', function (e) {
+  if (e && e.data && e.data.type === 'AD_READY') unlockFrameAudio();
+});
+
 function esc(s) {
   return String(s).replace(/[&<>"]/g, function (c) {
     return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c];

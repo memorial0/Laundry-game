@@ -46,7 +46,7 @@ await cp(join(ROOT, 'preview.html'), join(OUT, 'index.html'));
 
 /* 3. 자극 두 종. 세탁은 빌드가 필요 없다(순수 HTML/CSS/JS, 외부 요청 없음) */
 console.log('▸ 자극 복사');
-for (const f of ['index.html', 'scenes.js', 'style.css']) {
+for (const f of ['index.html', 'sfx.js', 'scenes.js', 'style.css']) {
   await cp(join(ROOT, 'laundry-ad', f), join(OUT, 'laundry-ad', f));
 }
 await cp(join(ROOT, 'game', 'dist'), join(OUT, 'game', 'dist'), { recursive: true });

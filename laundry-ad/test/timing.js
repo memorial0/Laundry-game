@@ -15,7 +15,10 @@
 const { bootPage, wait, dragSheet, suite } = require('./lib/harness');
 
 // SPEC 3장 장면표. null = 가변(장면 6은 드롭할 때까지 기다린다)
-const DUR = { 1: 5, 2: 5, 3: 6, 4: 7, 5: 6, 6: null, 7: 6, 8: 6, 9: 6, 10: 8 };
+/* null = 길이가 정해져 있지 않은 장면(참가자에게 달렸다).
+ *   5 — [되돌리기]를 누를 때까지 대기 + 누른 뒤 되감기 6초
+ *   6 — 시트를 넣을 때까지 대기 */
+const DUR = { 1: 5, 2: 5, 3: 6, 4: 7, 5: null, 6: null, 7: 6, 8: 6, 9: 6, 10: 8 };
 const PLAYLIST = { watch: [1, 2, 3, 4, 10], intervene: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] };
 
 const HOME = { x: 270, y: 1530 };   // 시트 처음 위치 (ART.S6.HOME)
@@ -24,6 +27,8 @@ const DROP = { x: 790, y: 1180 };   // 투입구       (ART.S6.DROP)
 const POLL = 50;          // 장면 전환 감지 간격(ms) — 측정 오차의 하한이다
 const TOL = 0.6;          // 허용 오차(초). 타이머 지터 + POLL을 넉넉히 덮는다
 const S6_THINK = 2000;    // 장면 6 진입 후 드롭까지 기다리는 시간(ms) — 참가자 조작 흉내
+const S5_THINK = 1200;    // 장면 5 진입 후 [되돌리기]를 누르기까지(ms) — 참가자 반응 흉내
+const REWIND_MS = 6000;   // 누른 뒤 되감기 애니메이션 길이(ms). scenes.js 와 같은 값이어야 한다
 const CAP = 120000;       // 안전 상한(ms)
 
 const CONDITIONS = [
@@ -39,6 +44,7 @@ async function play(cond) {
   const t0 = Date.now();
   const marks = [];            // {no, at} — 장면이 바뀐 시각
   let dropped = false;
+  let rewound = false;
   let end = 0;                 // 종료를 감지한 시각. 아래 대기 시간이 섞이면 안 된다
 
   while (Date.now() - t0 < CAP) {
@@ -48,6 +54,13 @@ async function play(cond) {
     // 장면 번호가 정해진 뒤부터 기록한다(부팅 직후 한 틱은 아직 null이다)
     if (no != null && (!last || last.no !== no)) marks.push({ no: no, at: Date.now() });
     if (E.finished) { end = Date.now(); await wait(400); break; }   // postMessage가 나갈 틈을 준다
+
+    /* 장면 5는 [되돌리기]를 눌러야 되감기가 시작된다. 안 누르면 여기서 영원히 기다리는데,
+     * 그건 실제 참가자가 가만히 있을 때와 똑같은 상태다. */
+    if (no === 5 && !rewound && Date.now() - marks[marks.length - 1].at > S5_THINK) {
+      var btn = w.document.querySelector('.rewind-btn');
+      if (btn) { btn.dispatchEvent(new w.MouseEvent('click', { bubbles: true })); rewound = true; }
+    }
 
     // 장면 6은 드롭해야 넘어간다. 진입 후 S6_THINK 만큼 있다가 한 번만 투입한다.
     if (no === 6 && !dropped && Date.now() - marks[marks.length - 1].at > S6_THINK) {
@@ -82,15 +95,18 @@ function report(t, r) {
   let fixed = 0;
   for (const s of spans) {
     const spec = DUR[s.no];
-    if (spec === null) {                       // 장면 6: 조작 시간이라 값을 못 박지 않는다
-      t.ok(s.sec >= S6_THINK / 1000, '장면 ' + s.no + ' 가변(조작 시간)', s.sec + 's');
+    if (spec === null) {                       // 장면 5·6: 참가자에게 달려 있어 값을 못 박는다
+      var floor = s.no === 5 ? (S5_THINK + REWIND_MS) / 1000 : S6_THINK / 1000;
+      t.ok(s.sec >= floor, '장면 ' + s.no + ' 가변(참가자 조작)', s.sec + 's');
       continue;
     }
     fixed += spec;
     t.ok(Math.abs(s.sec - spec) <= TOL,
       '장면 ' + s.no + ' 길이 ' + spec + 's', s.sec.toFixed(2) + 's');
   }
-  t.ok(fixed === (isInt ? 55 : 31), '고정분 합계 ' + (isInt ? 55 : 31) + 's', fixed + 's');
+  /* intervene 의 고정분은 장면 5·6 을 뺀 값이다(둘 다 참가자에게 달려 있다).
+   * 예전 55초에는 장면 5 의 6초가 포함돼 있었다 — 되감기를 광고가 알아서 했기 때문이다. */
+  t.ok(fixed === (isInt ? 49 : 31), '고정분 합계 ' + (isInt ? 49 : 31) + 's', fixed + 's');
 
   // 로그가 실측과 맞는지
   const total = spans.reduce((a, s) => a + s.sec, 0);

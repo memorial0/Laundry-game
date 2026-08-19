@@ -90,6 +90,33 @@ module.exports = async function () {
     '완전한 좌우 반전(거울상)이 아니다 — 같은 쪽에 오는 게이트도 있다',
     { 같은자리: (gatesA.length - sideDiff) + '/' + gatesA.length });
 
+  /* 기뢰 — 겨냥 부담이 두 판에서 같아야 한다.
+   *
+   * 좌우 위치가 A·B 에서 다른지는 여기서 안 본다. 기뢰는 **그 구간에서 안전한 물길의
+   * 반대쪽**에 놓기로 정해져 있고(MicrogateExperiment 의 MINE_R 주석), 안전한 쪽이 A·B
+   * 에서 같은 판에서는 기뢰 자리도 같을 수밖에 없다. 위치를 억지로 다르게 하면 그 판만
+   * 겨냥 부담이 사라져 오히려 평행성이 깨진다. 그래서 **반대쪽에 있는지**를 직접 본다. */
+  const minesA = A.filter(e => e.type === 'mine');
+  const minesB = B.filter(e => e.type === 'mine');
+  t.ok(minesA.length > 0 && minesA.length === minesB.length,
+    '기뢰 수가 같다', { A: minesA.length, B: minesB.length });
+
+  /** 그 기뢰 직후에 오는 게이트에서 안전한 쪽의 중심 x */
+  function safeCenterAfter(events, mineEv) {
+    const g = events.find(e => e.type === 'gate' && e.t > mineEv.t);
+    if (!g) return null;
+    const best = g.p1 >= g.p2 ? { x: g.x1, w: g.w1 } : { x: g.x2, w: g.w2 };
+    return best.x + best.w / 2;
+  }
+  const opposite = [[minesA, A], [minesB, B]].map(([mines, ev]) =>
+    mines.every(m => {
+      const safe = safeCenterAfter(ev, m);
+      return safe != null && ((safe < 240) !== (m.x < 240));   // 화면 반대쪽인가
+    }));
+  t.ok(opposite[0] && opposite[1],
+    '두 판 모두 기뢰가 안전한 물길의 반대쪽에 있다 (겨냥이 늘 선택을 강요한다)',
+    { A: opposite[0], B: opposite[1] });
+
   const narrowA = A.filter(e => e.type === 'enemy' && e.w < 400);
   const narrowB = B.filter(e => e.type === 'enemy' && e.w < 400);
   const movedFoes = narrowA.filter((e, i) => narrowB[i] && narrowB[i].x !== e.x).length;

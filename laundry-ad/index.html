@@ -45,6 +45,9 @@
     </div>
   </aside>
 
+  <!-- 효과음이 먼저 로드돼야 scenes.js 가 window.AD_SFX 를 잡는다.
+       빠지더라도 자극은 무음으로 그대로 돌아간다(scenes.js 에 무음 대역이 있다). -->
+  <script src="sfx.js"></script>
   <script src="scenes.js"></script>
 </body>
 </html>
