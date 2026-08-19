@@ -6,6 +6,24 @@
   //
   // name 은 이미 쓰고 있는 주소와 같아야 한다. 바꾸면 새 주소가 생기고
   // laundry-game.npcsun2.workers.dev 는 옛 판을 그대로 내보낸다.
+  //
+  // ── Cloudflare 대시보드 설정 (Workers & Pages → 이 Worker → Settings → Build) ──
+  //
+  //   Build command   : npm run build
+  //   Deploy command  : npx wrangler versions upload --assets=./dist
+  //   Root directory  : /
+  //
+  // Build command 를 None 으로 두면 배포가 반드시 깨진다. dist/ 는 저장소에 없고
+  // (.gitignore) build.mjs 가 만드는 것이라, 빌드를 건너뛰면 업로드할 폴더 자체가
+  // 없어서 wrangler 가 이렇게 멈춘다:
+  //   The directory specified by the "--assets" command line argument does not exist:
+  //   /opt/buildhome/repo/dist
+  //
+  // Build command 를 못 넣는 상황이면 Deploy command 를 `npm run deploy` 로 바꿔도
+  // 된다 — 그 스크립트가 빌드까지 같이 한다(package.json 참고).
+  //
+  // 참고: versions upload 는 '판'만 올리고 실서비스 주소로 넘기지 않는다.
+  // 프로덕션 브랜치에서 바로 내보내려면 wrangler deploy (= npm run deploy:production).
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "laundry-game",
   "compatibility_date": "2026-08-13",
