@@ -4,7 +4,12 @@ const { bootPage, wait, dragSheet, suite } = require('./lib/harness');
 
 const SCHEMA = ['sid', 'mode', 'ver', 't_start', 't_end', 'DWELL_TOTAL', 'DWELL_INT',
   'INT_DONE', 'INT_ATTEMPTS', 'T_FIRST_DRAG', 'T_MANIP', 'T_REWIND', 'HINT_SHOWN', 'CTA_CLICK',
-  'REDUCED_MOTION', 'AUDIO_OK', 'SFX_COUNT', 'scene_times', 'scene_enter'];
+  // 오른쪽 위 [×] — CTA 와 짝이 되는 행동. 둘 다 0 이면 8초가 지나 저절로 끝난 것이다
+  'CLOSE_CLICK', 'T_CARD',
+  'REDUCED_MOTION', 'AUDIO_OK', 'SFX_COUNT',
+  // 나래이션 — 세탁 자극에만 있다(게임에는 짝이 없다). INTEGRATION.md §5-12
+  'VOICE_OK', 'VOICE_SPOKEN',
+  'scene_times', 'scene_enter'];
 
 const done = w => (w.__messages.find(m => m && m.type === 'AD_DONE') || {}).payload;
 
@@ -69,6 +74,41 @@ module.exports = async function () {
   btn.dispatchEvent(new b.MouseEvent('click', { bubbles: true }));
   await wait(20);
   t.ok(b.__messages.filter(m => m && m.type === 'AD_DONE').length === 1, '재클릭해도 1회만 기록');
+  t.ok(p2.CLOSE_CLICK === 0, 'CTA 로 끝내면 CLOSE_CLICK 0');
+  t.ok(typeof p2.T_CARD === 'number', 'T_CARD 기록', p2.T_CARD);
+
+  /* 나가는 길이 [지금 구매하기] 하나뿐이면 그 클릭이 "사고 싶다"가 아니라
+   * "나가려면 이것밖에 없다"가 된다. CTA_CLICK 이 종속변인이라 닫기가 있어야
+   * 그 클릭이 선택이 된다 — 여기서는 닫기가 **CTA 로 세어지지 않는지**를 본다. */
+  t.section('[×] 로 나가기');
+  const xw = bootPage('?mode=watch&sid=log-close');
+  await wait(120);
+  xw.AD_ENGINE.pause();
+  xw.AD_ENGINE.gotoNo(10);
+  await wait(300);
+  const x = xw.document.querySelector('.ad-close');
+  t.ok(!!x, '닫기 버튼 존재');
+  t.ok(!!xw.document.querySelector('.cta'), '두 길이 함께 있다 (닫기가 CTA 를 대체하지 않는다)');
+  const closedAt = Date.now();
+  x.dispatchEvent(new xw.MouseEvent('click', { bubbles: true }));
+  await wait(30);
+  const pc = done(xw);
+  t.ok(!!pc, '[×] → AD_DONE 전송');
+  t.ok(pc.CLOSE_CLICK === 1, 'CLOSE_CLICK 1');
+  t.ok(pc.CTA_CLICK === 0, '**닫기는 CTA 로 세지 않는다**', pc.CTA_CLICK);
+  t.ok(Math.abs(pc.t_end - closedAt) < 60, 't_end = 누른 시점', pc.t_end - closedAt);
+  t.ok(x.classList.contains('is-pressed'), '눌림 피드백');
+  x.dispatchEvent(new xw.MouseEvent('click', { bubbles: true }));
+  xw.document.querySelector('.cta').dispatchEvent(new xw.MouseEvent('click', { bubbles: true }));
+  await wait(20);
+  t.ok(xw.__messages.filter(m => m && m.type === 'AD_DONE').length === 1,
+    '닫은 뒤 CTA 를 눌러도 늘어나지 않는다');
+  t.ok(done(xw).CTA_CLICK === 0, '닫은 뒤의 CTA 클릭은 기록되지 않는다');
+
+  /* 아무것도 안 누르고 8초가 지나면 둘 다 0 이다 — 분석에서 세 갈래를 가른다 */
+  t.ok(p.CTA_CLICK === 0 && p.CLOSE_CLICK === 0 && p.T_CARD === null,
+    '안 누르고 끝나면 둘 다 0 · T_CARD null',
+    { CTA: p.CTA_CLICK, CLOSE: p.CLOSE_CLICK, T_CARD: p.T_CARD });
 
   t.section('intervene — 개입 지표');
   const c = bootPage('?mode=intervene&ver=B&sid=log-i');

@@ -130,12 +130,18 @@ module.exports = async function () {
   t.ok(js.includes('세탁 조건에 따라 효과는 달라질 수 있습니다'), '팩샷 면책 문구');
   t.ok(js.includes('기능 설명 화면'), '장면 7 설명용 시각화 라벨');
 
-  /* 효과음도 합성이라 오디오 파일이 없다 — 여기 포함해 오프라인 조건을 같이 지킨다 */
+  /* 효과음도 합성이고 나래이션은 base64 로 심겨 있어 오디오 파일이 없다 —
+   * 여기 포함해 오프라인 조건을 같이 지킨다. voice-clips.js 는 생성물이지만
+   * 배포되는 파일이므로 같은 검사를 받는다. */
   const sfx = fs.readFileSync(path.join(APP_DIR, 'sfx.js'), 'utf8');
+  const voice = fs.readFileSync(path.join(APP_DIR, 'voice.js'), 'utf8');
+  const clips = fs.readFileSync(path.join(APP_DIR, 'voice-clips.js'), 'utf8');
   const external = /https?:\/\/(?!www\.w3\.org)/;
-  t.ok(!external.test(js) && !external.test(html) && !external.test(css) && !external.test(sfx),
+  t.ok(!external.test(js) && !external.test(html) && !external.test(css) &&
+    !external.test(sfx) && !external.test(voice) && !external.test(clips),
     '외부 요청 없음(오프라인 실행)');
-  t.ok(!/<script[^>]+src="(?!(sfx|scenes)\.js")/.test(html), '자체 스크립트 둘 외에는 없음');
+  t.ok(!/<script[^>]+src="(?!(sfx|voice-clips|voice|scenes)\.js")/.test(html),
+    '자체 스크립트 넷 외에는 없음');
   t.ok(!/@import|url\(['"]?https?:/.test(css), '외부 폰트·리소스 없음');
 
   return t.failed;

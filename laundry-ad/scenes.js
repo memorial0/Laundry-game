@@ -58,6 +58,27 @@
     fired: 0, played: 0, bedOn: false
   };
 
+  /* 나래이션 — 세탁 자극에만 있다(INTEGRATION.md §5-12 의 감수한 교란).
+   * 효과음과 달리 게임 자극에 짝이 없으므로 sfx.js 코어에 넣지 않고 따로 둔다.
+   * 스크립트가 빠져도 자극은 목소리 없이 그대로 돌아간다. */
+  var Voice = window.AD_VOICE || {
+    say: function () { return false; },
+    stop: function () {},
+    unlock: function () { return false; },
+    state: function () { return 'none'; },
+    voiceOk: function () { return null; },
+    spoken: 0, heard: 0, text: {}, sec: {}
+  };
+
+  /* 장면 번호 → 클립 키. 자막이 갈리는 장면만 뒤에 판별자가 붙는다 —
+   * 1·4 는 소재(ver), 6 은 수행 주체(mode)에 따라 자막이 다르다.
+   * voice.test.js 가 이 표를 자막 함수와 직접 대조한다. */
+  function voiceKey(no) {
+    if (no === 1 || no === 4) return 's' + no + CFG.ver;
+    if (no === 6) return 's6' + (CFG.mode === MODES.INTERVENE ? 'i' : 'w');
+    return 's' + no;
+  }
+
   /* OS "동작 줄이기" 설정 — 자극은 이 값에 따라 달라지지 않는다(속도·입자 수 고정).
    * 참가자 간 자극 동일성을 위해 로그에만 남긴다. */
   function readsReducedMotion() {
@@ -249,12 +270,12 @@
       '<ellipse cx="790" cy="1402" rx="230" ry="26" fill="' + PAL.ink + '" opacity=".14"/>' +
       '<rect x="576" y="900" width="424" height="500" rx="34" fill="url(#g-body)" stroke="' + PAL.edge + '" stroke-width="7"/>' +
       '<rect x="600" y="924" width="376" height="92" rx="22" fill="' + PAL.panel + '" stroke="' + PAL.edge + '" stroke-width="4"/>' +
-      '<circle cx="650" cy="970" r="24" fill="' + PAL.body + '" stroke="' + PAL.ringLo + '" stroke-width="6"/>' +
-      '<path d="M650,970 V952" stroke="' + PAL.ringLo + '" stroke-width="6" stroke-linecap="round"/>' +
+      '<g class="w-dial"><circle cx="650" cy="970" r="24" fill="' + PAL.body + '" stroke="' + PAL.ringLo + '" stroke-width="6"/>' +
+      '<path d="M650,970 V952" stroke="' + PAL.ringLo + '" stroke-width="6" stroke-linecap="round"/></g>' +
       '<rect x="696" y="950" width="150" height="40" rx="10" fill="' + PAL.opening + '" opacity=".85"/>' +
       '<rect x="712" y="964" width="52" height="12" rx="6" fill="' + PAL.brand + '"/>' +
-      '<circle cx="900" cy="970" r="11" fill="' + PAL.brand + '"/>' +
-      '<circle cx="940" cy="970" r="11" fill="' + PAL.ring + '"/>' +
+      '<circle class="w-led w-led-a" cx="900" cy="970" r="11" fill="' + PAL.brand + '"/>' +
+      '<circle class="w-led w-led-b" cx="940" cy="970" r="11" fill="' + PAL.ring + '"/>' +
       '<rect x="576" y="1372" width="424" height="28" rx="12" fill="' + PAL.bodyLo + '"/>' +
       doorArea +
       '</g>';
@@ -352,7 +373,7 @@
         '<g fill="' + PAL.stain + '" opacity=".72">' + core + '</g>';
     }
 
-    return '<g transform="translate(' + (o.x || 0) + ',' + (o.y || 0) + ') scale(' + s + ')">' + body + stain + '</g>';
+    return '<g class="garment ' + (o.cls || '') + '" transform="translate(' + (o.x || 0) + ',' + (o.y || 0) + ') scale(' + s + ')">' + body + stain + '</g>';
   };
 
   ART.lightGarment = function (o) { return ART.garment(V.light.shape, o); };
@@ -445,6 +466,7 @@
         '" r="9" fill="' + PAL.ringLo + '" opacity=".35"/>';
     }
     return ART.room({ noProps: true }) +
+      '<g class="drum-body">' +
       '<rect x="56" y="300" width="968" height="1160" rx="56" fill="url(#g-body)" stroke="' + PAL.edge + '" stroke-width="8"/>' +
       '<rect x="100" y="344" width="880" height="108" rx="26" fill="' + PAL.panel + '" stroke="' + PAL.edge + '" stroke-width="4"/>' +
       '<circle cx="176" cy="398" r="28" fill="' + PAL.body + '" stroke="' + PAL.ringLo + '" stroke-width="7"/>' +
@@ -459,7 +481,8 @@
       inner +
       '<circle cx="540" cy="1000" r="342" fill="none" stroke="' + PAL.ringLo + '" stroke-width="14" opacity=".45"/>' +
       '<path d="M290,832 q66,-102 186,-134" fill="none" stroke="#fff" stroke-width="34" stroke-linecap="round" opacity=".45"/>' +
-      '<path d="M264,918 q14,-40 40,-72" fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round" opacity=".3"/>';
+      '<path d="M264,918 q14,-40 40,-72" fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round" opacity=".3"/>' +
+      '</g>';
   };
 
   /* 염료 입자 */
@@ -503,8 +526,8 @@
       '</g>';
     return ART.room() + ART.washer({}) +
       ART.person({ arms: ART.armsHold }) +
-      ART.lightGarment({ x: 382, y: 1032, s: 0.92 }) +
-      ART.darkGarment({ x: 118, y: 1036, s: 0.86 }) +
+      ART.lightGarment({ x: 382, y: 1032, s: 0.92, cls: 's1-hold s1-hold-l' }) +
+      ART.darkGarment({ x: 118, y: 1036, s: 0.86, cls: 's1-hold s1-hold-d' }) +
       bubble;
   };
 
@@ -512,7 +535,7 @@
   ART.s2 = function (o) {
     o = o || {};
     return ART.room() +
-      ART.washer({ open: true }) +
+      ART.washer(o.still ? { open: true } : { both: true }) +
       ART.person({ arms: ART.armsHold }) +
       '<g class="' + anim('s2-toss', o.still) + '">' +
       ART.lightGarment({ x: 382, y: 1032, s: 0.92 }) +
@@ -550,7 +573,7 @@
   ART.holdFigure = function (o) {
     o = o || {};
     return ART.person({ mood: o.mood || 'neutral', arms: ART.armsLift }) +
-      ART.lightGarment({ x: 220, y: 840, s: 1.1, stained: !!o.stained });
+      ART.lightGarment({ x: 220, y: 840, s: 1.1, stained: !!o.stained, cls: 'hold-garment' });
   };
 
   ART.holdFrame = function (o) {
@@ -715,10 +738,10 @@
       '</g>' +
       '</g>' +
       '</g>' +
-      ART.text(540, 1214, 76, BRAND, { weight: 800, fill: PAL.brandLo }) +
-      '<rect x="384" y="1252" width="312" height="6" rx="3" fill="' + PAL.brand + '" opacity=".45"/>' +
-      ART.text(540, 1320, 44, '이염 방지 세탁 시트', { fill: PAL.mute }) +
-      ART.text(540, 1600, 26, '* 세탁 조건에 따라 효과는 달라질 수 있습니다.', { fill: PAL.mute, weight: 500 });
+      '<g class="s10-name">' + ART.text(540, 1214, 76, BRAND, { weight: 800, fill: PAL.brandLo }) + '</g>' +
+      '<rect class="s10-rule" x="384" y="1252" width="312" height="6" rx="3" fill="' + PAL.brand + '" opacity=".45"/>' +
+      '<g class="s10-sub">' + ART.text(540, 1320, 44, '이염 방지 세탁 시트', { fill: PAL.mute }) + '</g>' +
+      '<g class="s10-note">' + ART.text(540, 1600, 26, '* 세탁 조건에 따라 효과는 달라질 수 있습니다.', { fill: PAL.mute, weight: 500 }) + '</g>';
   };
 
   /* ----------------------------------------------------------
@@ -1008,22 +1031,46 @@
       sfx: 'card',
       subtitle: function () { return '세탁 중 이염을 줄여 밝은 옷을 보호하세요'; },
       render: function (ctx) {
+        /* 나가는 길이 [지금 구매하기] 하나뿐이면 그 클릭이 "사고 싶다"가 아니라
+         * "나가려면 이것밖에 없다"가 된다. CTA_CLICK 이 종속변인이라 이건
+         * 측정 문제다 — 실제 광고처럼 오른쪽 위에 닫기를 둔다.
+         * 게임 자극의 제품 카드에도 같은 버튼이 있다(INTEGRATION.md §5-13). */
         var el = ART.svg(
           ART.s10({ still: CFG.still !== null }), 'sc10',
+          '<button type="button" class="ad-close" aria-label="광고 닫기">' +
+          '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+          '<path d="M7 7 L17 17 M17 7 L7 17"/></svg>' +
+          '</button>' +
           '<button type="button" class="cta">지금 구매하기</button>'
         );
-        var btn = el.querySelector('.cta');
-        btn.addEventListener('click', function () {
-          if (btn.disabled) return;
+        if (CFG.still !== null) return el;
+
+        var shownAt = performance.now();
+        var done = false;
+
+        /** 두 버튼이 공유하는 마무리 — 어느 쪽을 눌렀는지만 다르다 */
+        function end(which, node) {
+          if (done) return;
+          done = true;
           var clickedAt = Date.now();
-          btn.disabled = true;             // 모의 광고 — 외부 이동 없음
-          btn.classList.add('is-pressed');
-          ctx.log.CTA_CLICK = 1;
-          /* 종료(=로그 스냅숏) 전에 울려야 SFX_COUNT 에 이 클릭이 포함된다.
-           * 이 클릭음은 게임 자극과 음색까지 같다 — sfx.js 의 CTA_VOICE. */
-          Sfx.play('cta');
-          ctx.engine.finish({ endAt: clickedAt }); // DWELL_TOTAL은 클릭 시점까지
-        });
+          node.disabled = true;              // 모의 광고 — 외부 이동 없음
+          node.classList.add('is-pressed');
+          ctx.log.T_CARD = round2((performance.now() - shownAt) / 1000);
+          ctx.log[which] = 1;
+          /* 종료(=로그 스냅숏) 전에 울려야 SFX_COUNT 에 이 클릭이 포함된다. */
+          Sfx.play(which === 'CTA_CLICK' ? 'cta' : 'beat');
+          ctx.engine.finish({ endAt: clickedAt });   // DWELL_TOTAL은 클릭 시점까지
+        }
+
+        var btn = el.querySelector('.cta');
+        /* 이 클릭음은 게임 자극과 음색까지 같다 — sfx.js 의 CTA_VOICE. */
+        btn.addEventListener('click', function () { end('CTA_CLICK', btn); });
+
+        /* 닫기는 가장 작은 신호(beat)로 받는다. 소리를 안 내면 CTA 만 청각 보상을
+         * 갖게 되어 그 자체가 CTA 쪽으로 미는 힘이 된다. 보상이 아니라 눌렸다는
+         * 확인이라 큐 목록에 새 신호를 만들지 않고 가장 작은 것을 쓴다. */
+        var close = el.querySelector('.ad-close');
+        close.addEventListener('click', function () { end('CLOSE_CLICK', close); });
         return el;
       }
     }
@@ -1078,12 +1125,24 @@
     T_REWIND: null,
     HINT_SHOWN: 0,                                 // 힌트 노출 횟수
     CTA_CLICK: 0,
+    /* 오른쪽 위 [×]. CTA 와 짝이 되는 행동이다 — 나가는 길이 구매뿐이면 CTA_CLICK 이
+     * "사고 싶다"가 아니라 "나가려면 이것밖에 없다"를 재게 된다. 둘 다 0 이면
+     * 8초가 지나 저절로 끝난 것이다. 게임 자극도 같은 이름으로 기록한다. */
+    CLOSE_CLICK: 0,
+    /* 초, 제품 메시지 화면이 뜬 뒤 누르기까지. 안 누르고 끝나면 null.
+     * 바로 닫은 것과 8초를 다 보고 닫은 것은 다른 행동이다. */
+    T_CARD: null,
     REDUCED_MOTION: readsReducedMotion(),          // OS 동작 줄이기 설정. 자극에는 영향 없음(기록 전용)
     /* 소리가 실제로 났는지 1/0, 해당 없음(sound=0·장치 없음)이면 null.
      * 자동재생 정책에 막히면 그 참가자만 무음으로 본 것이라, 이 값을 안 남기면
      * 분석에서 소리를 통제했다고 말할 수 없다. 게임 자극도 같은 이름으로 기록한다. */
     AUDIO_OK: null,
     SFX_COUNT: 0,                                  // 낸 신호 수(들렸는지와 무관) — 자극 간 청각 밀도 비교용
+    /* 나래이션이 실제로 들렸는지 1/0, 해당 없음이면 null. AUDIO_OK 와 따로 두는 이유:
+     * 재생 경로가 달라서(전용 AudioContext) 한쪽만 막힐 수 있다. 게임 자극에는
+     * 나래이션이 없으므로 이 두 필드는 세탁 쪽에만 있다. */
+    VOICE_OK: null,
+    VOICE_SPOKEN: 0,                               // 읽기를 요청한 문장 수(들렸는지와 무관)
     scene_times: {},                               // 장면별 체류(초)
     scene_enter: {}                                // 장면별 최초 진입 시각(epoch ms)
   };
@@ -1119,10 +1178,14 @@
         T_REWIND: LOG.T_REWIND,
         HINT_SHOWN: LOG.HINT_SHOWN,
         CTA_CLICK: LOG.CTA_CLICK,
+        CLOSE_CLICK: LOG.CLOSE_CLICK,
+        T_CARD: LOG.T_CARD,
         REDUCED_MOTION: LOG.REDUCED_MOTION,
         // 스냅숏을 뜨는 시점의 실제 상태를 읽는다 — 재생 도중 잠금이 풀릴 수 있다
         AUDIO_OK: Sfx.audioOk(),
         SFX_COUNT: Sfx.fired,
+        VOICE_OK: Voice.voiceOk(),
+        VOICE_SPOKEN: Voice.spoken,
         scene_times: st,
         scene_enter: byNo(LOG.scene_enter)
       };
@@ -1227,6 +1290,11 @@
       /* 장면 진입음. 정지 화면(?still)에서는 울리지 않는다 — 스토리보드 캡처용이라
        * 참가자가 보는 재생이 아니다. 장면 1 은 start 가 이미 울렸으므로 비워 둔다. */
       if (CFG.still === null && scene.sfx) Sfx.play(scene.sfx);
+
+      /* 자막을 목소리로도 읽는다. 정지 화면(?still)에서는 읽지 않는다 —
+       * 스토리보드 캡처는 참가자가 보는 재생이 아니다.
+       * 앞 장면 문장이 아직 울리고 있으면 say() 안에서 끊는다. */
+      if (CFG.still === null) Voice.say(voiceKey(scene.no));
 
       this.sceneEnteredAt = performance.now();
       this.remaining = scene.dur === null ? Infinity : scene.dur * 1000;
@@ -1338,6 +1406,7 @@
       LOG.t_end = o.endAt || Date.now();
       LOG.DWELL_TOTAL = round2((LOG.t_end - LOG.t_start) / 1000);
       Sfx.stopBed();   // 잦아들며 꺼진다 — 아래 로그 마감은 이걸 기다리지 않는다
+      Voice.stop();    // 마지막 문장이 종료 화면까지 넘어가지 않게 끊는다
       document.documentElement.dataset.state = 'ended';
       Log.done();
       Debug.sync();

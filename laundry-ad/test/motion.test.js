@@ -150,5 +150,96 @@ module.exports = async function () {
       'intervene 전용 구간이 공통 구간보다 화려하지 않다', { 공통: shared, intervene전용: only });
   }
 
+  /* ---------------------------------------------------------------
+   * E. CSS 가 거는 손잡이가 그림에 실제로 있다
+   *
+   * 연출은 style.css 의 선택자가 scenes.js 의 class 이름을 맞히는 것으로만 붙어
+   * 있다. 그림 쪽에서 이름을 바꾸거나 그룹을 없애면 규칙은 조용히 아무것도 안
+   * 걸고, 화면은 연출 없이 재생되는데 **테스트는 전부 초록으로 통과한다.**
+   * 여기서 두 파일을 맞대어 그 조용한 소실을 막는다.
+   * --------------------------------------------------------------- */
+  t.section('E. 장면 규칙의 손잡이가 그림에 있다');
+
+  const { bootArt } = require('./lib/harness');
+  const ART = bootArt('A');
+  /* 장면별 마크업. 재생(?still 아님) 기준이다 — 연출은 재생에만 붙는다. */
+  const MARKUP = {};
+  for (let n = 1; n <= 10; n++) MARKUP[n] = ART['s' + n]({});
+
+  /* 규칙 선택자에서 '.sc<N> ... .foo' 의 foo 들을 뽑는다.
+   * .cam 은 ART.svg 가 붙이고 .scene/.is-in 등 상태 클래스는 엔진이 붙이므로 뺀다. */
+  const ENGINE_CLASSES = new Set(['cam', 'cam-still', 'scene', 'scene-svg', 'is-in', 'is-out',
+    'is-hold', 'is-rewinding', 'is-closed', 'is-dropped', 'is-dragging', 'is-watch',
+    'hint-on', 'rewind-prompt', 'rewind-btn', 'rw-msg', 'cta']);
+
+  const missing = [];
+  for (const r of all) {
+    const m = r.selector.match(/\.sc(\d+)\b/);
+    if (!m) continue;
+    const no = Number(m[1]);
+    if (!MARKUP[no] || !hasMotion(r.body)) continue;
+    const classes = (r.selector.match(/\.[a-z][\w-]*/g) || [])
+      .map(c => c.slice(1))
+      .filter(c => !/^sc\d+$/.test(c) && !ENGINE_CLASSES.has(c));
+    for (const c of classes) {
+      if (!new RegExp('class="[^"]*\\b' + c + '\\b').test(MARKUP[no])) {
+        missing.push(`장면 ${no} · .${c} (${r.selector})`);
+      }
+    }
+  }
+  t.ok(missing.length === 0,
+    '장면 규칙이 가리키는 class 가 그림에 전부 있다', missing);
+
+  /* ---------------------------------------------------------------
+   * F. 종속변인이 되는 버튼은 부추기지 않는다
+   *
+   * 장면 10 에는 나가는 길이 둘이다 — [지금 구매하기]와 오른쪽 위 [×].
+   * **둘 다 종속변인이다**(CTA_CLICK · CLOSE_CLICK). 한쪽만 맥동하거나 더 늦게·
+   * 더 화려하게 등장하면 그 연출이 곧 클릭률 차이가 된다.
+   *
+   * [되돌리기](.rewind-btn)는 맥동해도 된다 — 그쪽은 진행 조건이라 안 누르면
+   * 광고가 끝나지 않고, 재는 값이 "눌렀는가"가 아니라 "언제 눌렀는가"다.
+   * --------------------------------------------------------------- */
+  t.section('F. 나가는 두 길을 한쪽으로 몰지 않는다');
+  {
+    const pick = sel => all.filter(r => r.selector.split(',').some(x => x.trim() === sel));
+    const animOf = rules2 => {
+      const m = rules2.map(r => (r.body.match(/animation:\s*([^;]+)/) || [])[1])
+        .filter(Boolean).map(v => v.trim());
+      return m.length ? m[0] : null;
+    };
+    const cta = animOf(pick('.cta'));
+    const close = animOf(pick('.ad-close'));
+    t.ok(cta === close,
+      '[구매하기]와 [×]가 같은 방식으로 등장한다',
+      { CTA: cta || '없음', 닫기: close || '없음' });
+    t.ok(!/infinite/.test(cta || '') && !/infinite/.test(close || ''),
+      '둘 다 맥동하지 않는다 (되돌리기와 달리 여기는 종속변인이다)');
+
+    /* 여기서 실제로 사고가 났다.
+     *
+     * .cta 는 left:50% + transform:translateX(-50%) 로 가운데를 잡는데, 등장
+     * 애니메이션의 키프레임이 `transform: translateY(0) scale(1)` 이었다.
+     * 애니메이션은 일반 선언보다 우선하고 fill-mode 가 both 라, **끝난 뒤에도
+     * 그 값이 남아 가운데 정렬을 통째로 덮어썼다.** 버튼이 화면 한가운데에서
+     * 시작해 오른쪽으로 58cqw 뻗어 잘려 나갔고, 눌림 효과(.is-pressed)도
+     * 같은 이유로 먹지 않았다. 브라우저로 찍어 보기 전에는 안 보이는 종류다.
+     *
+     * 고친 방법은 키프레임에서 transform 대신 개별 속성 translate/scale 을
+     * 쓰는 것이다 — 이쪽은 transform 과 합성된다. 여기서 그 규율을 지킨다. */
+    const kf = name => {
+      const m = CSS.match(new RegExp('@keyframes\\s+' + name + '\\s*\\{([\\s\\S]*?)\\n\\}'));
+      return m ? m[1] : '';
+    };
+    const bad = [['.cta', cta], ['.ad-close', close]]
+      .filter(([, a]) => a)
+      .map(([sel, a]) => [sel, a.split(/\s+/)[0]])
+      .filter(([sel, name]) => /(^|[;{\s])transform\s*:/.test(kf(name))
+        && pick(sel).some(r => /(^|[;{\s])transform\s*:/.test(r.body)))
+      .map(([sel, name]) => `${sel} ← @keyframes ${name}`);
+    t.ok(bad.length === 0,
+      '버튼 등장 키프레임이 transform 을 덮어쓰지 않는다 (가운데 정렬이 죽는다)', bad);
+  }
+
   return t.failed;
 };

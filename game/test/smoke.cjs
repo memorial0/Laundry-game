@@ -43,6 +43,7 @@ async function play(cond, bundle) {
   let rescueAt = 0;
   let rewindAt = 0;
   let end = 0;
+  let seenClose = false;      // 제품 카드에 [×] 와 CTA 가 함께 있었는가
 
   while (Date.now() - t0 < CAP) {
     const phase = w.AD_PHASE;
@@ -62,17 +63,26 @@ async function play(cond, bundle) {
       if (Date.now() - rescueAt > RESCUE_THINK) steer(w);
     }
 
+    /* 카드가 떠 있는 동안 나가는 길이 둘인지 본다 — 뒤에서 DOM 이 사라지므로
+     * 이 순간에 세어 둬야 한다. CTA 하나뿐이면 그 클릭이 선택이 아니게 된다. */
+    if (phase === 'product_card' && !seenClose) {
+      const card = w.document.querySelector('.product-card');
+      if (card) {
+        seenClose = !!card.querySelector('.ad-close') && !!card.querySelector('.cta');
+      }
+    }
+
     if (w.__messages.some(m => m && m.type === 'AD_DONE')) { end = Date.now(); break; }
     await wait(POLL);
   }
   if (!end) end = Date.now();
 
-  const spans = marks.map((m, i) => ({
+  const spans2 = marks.map((m, i) => ({
     phase: m.phase,
     sec: ((i + 1 < marks.length ? marks[i + 1].at : end) - m.at) / 1000
   }));
   const out = {
-    cond, spans,
+    cond, spans: spans2, seenClose,
     total: (end - t0) / 1000,
     log: w.AD_RESULT && JSON.parse(JSON.stringify(w.AD_RESULT)),
     messages: w.__messages.map(m => m && m.type),
@@ -90,7 +100,7 @@ const EXPECTED = {
 };
 
 function report(t, r) {
-  const { cond, spans, log } = r;
+  const { cond, spans, log, seenClose } = r;
   t.section(name(cond) + '  (' + r.total.toFixed(1) + 's)');
 
   t.ok(!r.errors.length, 'JS 에러 없음', r.errors.length ? r.errors : undefined);
@@ -139,6 +149,14 @@ function report(t, r) {
     t.ok(seen.indexOf('product_card') >= 0, '제품 메시지 + CTA 카드를 지난다', seen.join(' → '));
   }
   t.ok(log.CTA_CLICK === 0, 'CTA 미클릭은 0 으로 기록 (null 아님)', log.CTA_CLICK);
+  /* 나가는 길이 [지금 다운로드] 하나뿐이면 그 클릭이 "받고 싶다"가 아니라
+   * "나가려면 이것밖에 없다"가 된다. CTA_CLICK 이 종속변인이라 닫기가 있어야
+   * 그 클릭이 선택이 된다. 세탁 자극의 장면 10 에도 같은 버튼이 있다. */
+  t.ok(log.CLOSE_CLICK === 0, '[×] 미클릭도 0 으로 기록 (null 아님)', log.CLOSE_CLICK);
+  t.ok(log.T_CARD === null, '아무것도 안 누르면 T_CARD = null', log.T_CARD);
+  if (cond.mode !== 'tutorial') {
+    t.ok(seenClose, '제품 카드에 나가는 길이 둘이다 ([×] 와 CTA)', seenClose);
+  }
 
   /* 소리 — jsdom 에는 AudioContext 가 없어 실제로는 울리지 않는다.
    * 여기서 보는 것은 "몇 번 울렸어야 하는가"가 로그에 남고, 소리 코드가 자극을
