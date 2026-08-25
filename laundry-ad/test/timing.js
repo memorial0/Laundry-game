@@ -18,7 +18,7 @@ const { bootPage, wait, dragSheet, suite } = require('./lib/harness');
 /* null = 길이가 정해져 있지 않은 장면(참가자에게 달렸다).
  *   5 — [되돌리기]를 누를 때까지 대기 + 누른 뒤 되감기 6초
  *   6 — 시트를 넣을 때까지 대기 */
-const DUR = { 1: 5, 2: 5, 3: 6, 4: 7, 5: null, 6: null, 7: 6, 8: 6, 9: 6, 10: 8 };
+const DUR = { 1: 4, 2: 5, 3: 6, 4: 8, 5: null, 6: null, 7: 6, 8: 6, 9: 6, 10: 8 };
 const PLAYLIST = { watch: [1, 2, 3, 4, 10], intervene: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] };
 
 const HOME = { x: 270, y: 1530 };   // 시트 처음 위치 (ART.S6.HOME)

@@ -101,12 +101,15 @@ html, body {
   letter-spacing: -0.01em;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
   opacity: 0;
-  transform: translateY(0.8cqh);
-  transition: opacity 320ms ease, transform 320ms ease;
+  /* 컷이 바뀔 때마다 자막이 한 번 올라온다 — 장면 전환을 몸으로 느끼게 하는
+   * 가장 싼 수단이다. 크기 변화는 아주 조금만 준다(글자가 튀면 읽기가 방해된다). */
+  transform: translateY(1.7cqh) scale(0.986);
+  transform-origin: 50% 100%;
+  transition: opacity 360ms ease, transform 360ms cubic-bezier(.2, .8, .3, 1.02);
 }
 #subtitle-text.is-in {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateY(0) scale(1);
 }
 
 .scene-svg text {
@@ -121,6 +124,214 @@ html, body {
  * prefers-reduced-motion 오버라이드를 두지 않는다(설정값은 로그 REDUCED_MOTION에만
  * 남긴다). 접근성 목적으로도 여기에 미디어 쿼리를 추가하지 말 것.
  */
+
+/* 00. 컷 전환 — 장면마다 다른 방식으로 들어온다
+ *
+ * 원래는 10장면이 전부 같은 420ms 디졸브였다. 그래서 무슨 일이 일어나든 화면은
+ * 늘 같은 속도로 흐려졌다 밝아졌다만 했다. 세탁 광고가 실제로 쓰는 문법(그래픽
+ * 매치, 휩 팬, 모양 와이프, 하드 컷)에 맞춰 컷마다 다르게 들어오게 한다.
+ *
+ * 엔진은 새 장면을 붙이고 500ms 뒤에 이전 장면을 지운다(scenes.js goto). 그 사이
+ * 두 장면이 겹쳐 있으므로 들어오는 쪽이 화면을 다 못 덮어도 뒤가 비지 않는다.
+ * 대신 전환은 500ms 를 넘기면 안 된다 — 넘기면 이전 장면이 도중에 사라진다.
+ *
+ * blur 는 쓰지 않는다. 큰 레이어에 필터를 걸면 기기 성능에 따라 프레임이 튀고,
+ * 그러면 참가자마다 자극이 달라진다. 변위·회전·클립으로만 만든다.
+ *
+ * :has(.cam) 로 걸어 둔다 — 정지 화면(?still)은 그룹 이름이 cam-still 이라 이 규칙이
+ * 안 걸린다. 스토리보드 캡처가 전환 도중 상태로 찍히는 일이 없다(카메라·인물과 같은 규율).
+ *
+ * 들어오는 장면 번호로만 건다. 재생 목록이 조건마다 고정이라 "장면 3으로 들어온다"는
+ * 곧 "장면 2에서 온다"는 뜻이고, 장면 2·3·4·10 진입은 watch·intervene 양쪽에 모두
+ * 있다 — 그래서 이 전환들은 조건 간 비대칭을 넓히지 않는다.
+ */
+
+/* 1 → 2 · 휩 컷. 장면 1의 카메라가 오른쪽으로 밀리던 흐름을 그대로 받아
+ * 다음 장면이 같은 방향으로 쓸려 들어온다(모션 벡터를 맞춘 컷). */
+@keyframes cut-whip-out {
+  0%   { opacity: 1; transform: translateX(0) skewX(0deg); }
+  100% { opacity: 0; transform: translateX(-6%) skewX(1.5deg); }
+}
+@keyframes cut-whip-in {
+  0%   { opacity: 0; transform: translateX(10%) skewX(-2.5deg); }
+  46%  { opacity: 1; }
+  100% { opacity: 1; transform: translateX(0) skewX(0deg); }
+}
+.scene:has(.cam)[data-scene="1"].is-out { animation: cut-whip-out 260ms cubic-bezier(.55, 0, .9, .45) both; }
+.scene:has(.cam)[data-scene="2"].is-in  { animation: cut-whip-in 400ms cubic-bezier(.12, .75, .25, 1) both; }
+
+/* 2 → 3 · 드럼 스핀. 장면 3은 드럼 클로즈업이고 내용물이 시계 방향으로 돈다.
+ * 화면째 같은 방향으로 돌면서 제자리를 찾는다 — 컷 앞뒤의 회전 방향이 이어진다.
+ * 시작 배율을 1보다 크게 잡아 회전 중에 모서리가 뜨지 않게 한다. */
+@keyframes cut-spin-in {
+  0%   { opacity: 0; transform: rotate(-15deg) scale(1.16); }
+  40%  { opacity: 1; }
+  100% { opacity: 1; transform: rotate(0deg) scale(1); }
+}
+.scene:has(.cam)[data-scene="3"].is-in { animation: cut-spin-in 440ms cubic-bezier(.18, .8, .28, 1) both; }
+
+/* 3 → 4 · 하드 컷. 실패는 스며들면 안 된다. 디졸브를 걷어내고 200ms 안에 때린다.
+ * 아주 살짝 크게 들어왔다 제자리로 떨어지면서 "쿵" 하는 느낌을 만든다. */
+@keyframes cut-hard-out { 0% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes cut-snap-in {
+  0%   { opacity: 0; transform: scale(1.055); }
+  34%  { opacity: 1; transform: scale(.994); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.scene:has(.cam)[data-scene="3"].is-out { animation: cut-hard-out 110ms linear both; }
+.scene:has(.cam)[data-scene="4"].is-in  { animation: cut-snap-in 200ms cubic-bezier(.2, .9, .3, 1) both; }
+
+/* → 10 · 거품 와이프. 팩샷은 비누 거품이 열리듯 드러난다. 세제 광고가 거품으로
+ * 화면을 넘기는 그 문법이다. 92% 는 세로 화면에서 네 모서리를 다 덮는 값이다
+ * (가장 먼 모서리까지가 약 85%). watch 는 장면 4에서, intervene 은 장면 9에서
+ * 넘어오지만 전환 자체는 같다. */
+@keyframes cut-bubble-in {
+  0%   { opacity: 1; clip-path: circle(0% at 50% 60%); }
+  100% { opacity: 1; clip-path: circle(92% at 50% 60%); }
+}
+.scene:has(.cam)[data-scene="10"].is-in { animation: cut-bubble-in 460ms cubic-bezier(.32, .68, .24, 1) both; }
+
+/* 0. 카메라 — 장면 내용 전체를 미는 유일한 수단
+ *
+ * 뷰박스는 전 장면 1080x1920 고정이다. 화면을 좁히거나 미는 일은 .cam 의 transform
+ * 하나로만 한다. 이렇게 두면 (1) 장면 그림 코드가 카메라를 몰라도 되고 (2) 조건·버전이
+ * 같은 카메라를 쓰는 것이 CSS 한 줄로 보장된다.
+ *
+ * 확대 기준점을 c, 배율을 s 라 할 때 translate(c(1-s)) scale(s) 이다.
+ * transform-origin 을 0 0 으로 고정해야 이 식이 성립한다.
+ */
+.cam { transform-origin: 0 0; will-change: transform; }
+
+/* 장면 4 — 실패 결과(7초). 여기가 이야기의 전환점인데 정지 화면이었다.
+ * 넓은 그림으로 1.3초 보여 준 뒤 얼룩진 옷(1080x1920 기준 330,950)으로 밀고 들어가
+ * 남은 시간 동안 아주 느리게 더 다가간다. 얼룩은 작게 그려져 있어서 밀지 않으면
+ * 휴대폰 화면에서 회색 얼룩으로만 보인다.
+ *
+ * 이 장면은 watch·intervene 재생 목록에 모두 있다 — 그래서 여기 넣은 연출은
+ * 조건 간 비대칭을 넓히지 않는다. intervene 전용 구간(5~9)에 연출을 더할 때는
+ * 그 점을 먼저 따져야 한다. */
+@keyframes cam-push4 {
+  0%,
+  16%  { transform: translate(0px, 0px) scale(1); animation-timing-function: cubic-bezier(.33, 0, .12, 1); }
+  50%  { transform: translate(-181.5px, -522.5px) scale(1.55); animation-timing-function: linear; }
+  100% { transform: translate(-189.75px, -546.25px) scale(1.575); }
+}
+.sc4 .cam { animation: cam-push4 8s both; }
+
+/* 장면 1 인물 — 망설임.
+ *
+ * 이 광고의 전제가 "흰옷 검은옷 따로 돌리기 귀찮다"인데, 정작 인물은 두 벌을 들고
+ * 가만히 서 있기만 했다. 머리를 좌우로 돌려 두 벌을 번갈아 보게 하면 그 망설임이
+ * 화면에 생긴다. 짙은 옷은 왼쪽(x=118), 밝은 옷은 오른쪽(x=382)에 있다.
+ *
+ * 몸통에는 transform 속성이 이미 붙어 있으므로(person 의 translate) CSS transform 을
+ * 쓰면 인물이 원점으로 튄다 — translate/rotate 개별 속성으로 합성한다. 머리·팔은
+ * 새로 만든 <g> 라 속성 transform 이 없지만, 회전 기준을 목·어깨에 두어야 하므로
+ * fill-box 를 쓴다. */
+@keyframes fig-look {
+  0%,
+  18%  { rotate: 0deg; }
+  40%  { rotate: -8deg; }     /* 짙은 옷 쪽 */
+  64%  { rotate: 7deg; }      /* 밝은 옷 쪽 */
+  100% { rotate: 1.5deg; }
+}
+@keyframes fig-idle {
+  0%   { translate: 0 0; rotate: 0deg; }
+  55%  { translate: 0 -3px; rotate: -.4deg; }
+  100% { translate: 0 5px; rotate: .5deg; }
+}
+.sc1 .cam .person .head {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;          /* 목 */
+  animation: fig-look 4s cubic-bezier(.45, 0, .3, 1) both;
+}
+.sc1 .cam .person {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;          /* 발밑 */
+  animation: fig-idle 4s ease-in-out both;
+}
+
+/* 장면 2 인물 — 던지는 뒤따름.
+ *
+ * s2-toss 는 1.4초 뒤에 시작해 옷만 세탁기로 날려 보냈다. 정작 던진 사람은
+ * 미동도 없었다. 팔을 세탁기 쪽으로 올렸다 내리고 몸통이 따라 기울게 한다.
+ * 5초 기준 28% 가 1.4초 — 옷이 출발하는 순간에 맞춘다.
+ *
+ * 팔은 회전이 아니라 이동으로 든다. 양팔을 한 덩어리로 회전시키면 한쪽은 올라가고
+ * 반대쪽은 내려가서 두 손으로 넣는 동작이 안 된다. */
+@keyframes fig-toss-arms {
+  0%,
+  26%  { translate: 0 0; rotate: 0deg; }
+  33%  { translate: -3px 4px; rotate: 1.5deg; }    /* 살짝 뒤로 모았다가 */
+  44%  { translate: 11px -23px; rotate: -5deg; }   /* 투입구 쪽으로 */
+  62%  { translate: 4px -7px; rotate: -1.5deg; }
+  100% { translate: 0 0; rotate: 0deg; }
+}
+@keyframes fig-toss-body {
+  0%,
+  26%  { translate: 0 0; rotate: 0deg; }
+  33%  { translate: -2px 0; rotate: -1.2deg; }
+  46%  { translate: 5px 0; rotate: 3.4deg; }
+  70%  { translate: 1px 0; rotate: .8deg; }
+  100% { translate: 0 0; rotate: 0deg; }
+}
+.sc2 .cam .person .arms {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;            /* 어깨 */
+  animation: fig-toss-arms 5s cubic-bezier(.3, 0, .35, 1) both;
+}
+.sc2 .cam .person {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: fig-toss-body 5s cubic-bezier(.3, 0, .35, 1) both;
+}
+
+/* 장면 4 인물 — 카메라가 다가가는 동안 어깨가 내려앉는다.
+ *
+ * <g class="person"> 에는 이미 transform="translate(x,y)" 속성이 붙어 있다. CSS 의
+ * transform 을 쓰면 그 속성을 덮어써 인물이 원점으로 튄다. 그래서 개별 속성
+ * translate/rotate 를 쓴다 — 이쪽은 속성 transform 과 합성된다(translate → rotate →
+ * transform 순). 회전 기준은 발밑이어야 해서 fill-box 의 아래쪽 가운데로 잡는다. */
+@keyframes fig-sag {
+  0%,
+  19%  { translate: 0 -10px; rotate: 0deg; }
+  49%  { translate: 0 19px; rotate: -1.6deg; }
+  100% { translate: 0 26px; rotate: -2deg; }
+}
+/* .cam 아래에 두는 것이 핵심이다. 정지 화면(?still)에서는 그룹 이름이 cam-still 이라
+ * 이 선택자가 아예 안 걸린다 — 앞으로 장면 애니메이션은 전부 .cam 아래에 두면
+ * 스토리보드 캡처가 저절로 정지 상태로 남는다. */
+.sc4 .cam .person {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: fig-sag 8s cubic-bezier(.4, 0, .3, 1) both;
+}
+
+/* 장면 1 — 목표(5초). 말풍선이 뜨고 나면 4초 넘게 아무것도 안 변했다.
+ * 아주 느리게 밀어 정지 화면으로 안 읽히게만 한다. 자막 읽는 시간은 안 건드린다. */
+@keyframes cam-push1 {
+  0%   { transform: translate(0px, 0px) scale(1); }
+  100% { transform: translate(-36px, -90px) scale(1.09); }
+}
+.sc1 .cam { animation: cam-push1 4s linear both; }
+
+/* 장면 2 — 제품 미사용(5초). 세탁기 투입구(790,1180) 쪽으로 다가간다.
+ * 실패로 들어가기 직전이라 "저기로 들어간다"는 방향감을 준다. */
+@keyframes cam-push2 {
+  0%   { transform: translate(0px, 0px) scale(1); animation-timing-function: cubic-bezier(.3, 0, .7, 1); }
+  100% { transform: translate(-98px, -161px) scale(1.14); }
+}
+.sc2 .cam { animation: cam-push2 5s both; }
+
+/* 장면 10 — 팩샷 + CTA(8초). 여기만 반대로 당긴다. 조금 다가가 있던 화면이
+ * 물러나면서 제품·문구·버튼이 차례로 자리를 잡는다. 3.5초 지나면 멈춰서
+ * 남은 4.5초는 완전히 고정 — CTA는 흔들리면 안 된다. */
+@keyframes cam-pull10 {
+  0%   { transform: translate(-64.8px, -108px) scale(1.12); animation-timing-function: cubic-bezier(.16, .8, .3, 1); }
+  44%  { transform: translate(0px, 0px) scale(1); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+.sc10 .cam { animation: cam-pull10 8s both; }
 
 /* 1. 말풍선 등장 */
 @keyframes s1-bubble {
@@ -146,21 +357,44 @@ html, body {
 }
 
 /* 3. 드럼 회전 · 염료 번짐 */
-@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 속도 램프. 원래는 7초에 한 바퀴 도는 등속 무한 회전이라, 6초짜리 장면에서
+ * 한 바퀴도 못 돌고 속도도 내내 같았다 — 세탁기가 아니라 회전목마에 가까웠다.
+ *
+ * 이제 장면 길이와 같은 6초 동안 딱 한 번, 멈춘 상태에서 감아올렸다가 다시
+ * 멈추는 데까지 간다. 실제 세탁 행정의 호흡이고, 끝에서 거의 멎기 때문에
+ * 곧바로 이어지는 실패 하드 컷이 더 세게 떨어진다.
+ *
+ * 램프는 각도 차이가 아니라 이징 하나로 만든다. 키프레임을 여러 개 두고
+ * 구간마다 등속으로 가면 경계에서 속도가 계단처럼 튄다(변속기처럼 보인다).
+ * 강한 ease-in-out 곡선 하나면 각속도가 끊기지 않는다. 실측하면 양 끝 약 18°/s,
+ * 한가운데 약 450°/s(초당 1.25바퀴)로 25배 차이가 난다. 전체 3.2바퀴.
+ *
+ * 도는 것은 옷 두 개뿐이다. 드럼 타공은 ART.drum 이 이 그룹 밖에 그리므로
+ * 빨라져도 무늬가 깜빡이지 않는다(기기 주사율에 따라 달라 보일 일이 없다). */
+@keyframes s3-ramp {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(1150deg); }
+}
 .s3-tumble {
   transform-box: fill-box;
   transform-origin: 50% 50%;
-  animation: spin 7s linear infinite;
+  animation: s3-ramp 6s cubic-bezier(.62, 0, .38, 1) both;
 }
+/* 염료 번짐은 드럼 램프와 같은 곡선·같은 길이로 간다. 예전엔 5.6초 ease-in 이라
+ * 드럼이 25배로 빨라졌다 멎는 동안 저 혼자 제 시계로 번졌다. 이제 드럼이 가장 빠른
+ * 한가운데에서 염료도 가장 빠르게 퍼진다(s3-ramp 와 같은 cubic-bezier). */
 @keyframes s3-tint { 0% { opacity: 0; } 100% { opacity: .75; } }
-.s3-tint { animation: s3-tint 5.6s ease-in both; }
+.s3-tint { animation: s3-tint 6s cubic-bezier(.62, 0, .38, 1) both; }
 
 @keyframes s3-drift {
   0%   { opacity: 0; transform: none; }
   25%  { opacity: .9; }
   100% { opacity: .35; transform: translate(var(--tx), var(--ty)); }
 }
-.s3-drift { opacity: 0; animation: s3-drift 3.4s ease-out infinite; }
+/* 3.4초는 6초 장면에서 1.76주기라 마지막 한 바퀴가 하드 컷에 잘려 나갔다.
+ * 3초면 정확히 두 바퀴가 끝나고 장면이 넘어간다. */
+.s3-drift { opacity: 0; animation: s3-drift 3s ease-out infinite; }
 .part-static { opacity: .7; }
 
 /* 5. 되감기 — 4 → 3 → 2 역방향, 세탁 시작 직전에 정지 */
@@ -259,8 +493,11 @@ html, body {
   66%     { transform: translate(790px, 1180px) scale(.22); opacity: 0; }
   100%    { transform: translate(790px, 1180px) scale(.22); opacity: 0; }
 }
-.sc6.is-watch .s6-grip { animation: s6-grip-watch var(--s6-watch-dur, 4000ms) ease-in-out both; }
-.sc6.is-watch .s6-sheet { animation: s6-sheet-watch var(--s6-watch-dur, 4000ms) ease-in-out both; }
+/* is-watch 는 이제 정지 화면(?still=6)에도 붙는다 — 표시를 끄는 것은 거기서도 필요하기
+ * 때문이다. 그래서 시연 애니메이션은 .cam 으로 한 번 더 막는다. 안 그러면 스토리보드가
+ * 시연 도중 상태로 찍힌다. */
+.sc6.is-watch .cam .s6-grip { animation: s6-grip-watch var(--s6-watch-dur, 4000ms) ease-in-out both; }
+.sc6.is-watch .cam .s6-sheet { animation: s6-sheet-watch var(--s6-watch-dur, 4000ms) ease-in-out both; }
 
 /* 7. 염료 흡착 */
 @keyframes s7-absorb {
@@ -287,6 +524,26 @@ html, body {
   0%   { opacity: 0; transform: translateY(40px) scale(.92); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
+
+/* 장면 10 버튼 등장 — 그림용 s10-pack 과 **모양은 같고 쓰는 속성이 다르다.**
+ *
+ * 왜 따로 두나 (이것 때문에 [지금 구매하기]가 화면 밖으로 잘려 있었다)
+ *   .cta 는 left:50% + transform:translateX(-50%) 로 가운데를 잡는다. 그런데
+ *   s10-pack 의 100% 키프레임이 `transform: translateY(0) scale(1)` 이라
+ *   **애니메이션이 그 가운데 정렬을 통째로 덮어썼다.** 애니메이션은 일반
+ *   선언보다 우선하고 fill-mode 가 both 라 끝난 뒤에도 그 값이 남는다.
+ *   그래서 버튼이 화면 한가운데에서 시작해 오른쪽으로 58cqw 뻗어 잘렸다.
+ *   같은 이유로 .cta.is-pressed 의 눌림 효과도 먹지 않았다.
+ *
+ *   여기서는 transform 대신 **개별 속성 translate/scale** 을 쓴다. 이쪽은
+ *   transform 과 합성되므로(translate → scale → transform 순) 가운데 정렬이
+ *   그대로 살아 있다. 인물·카메라 연출에서 쓰는 것과 같은 규율이다.
+ *
+ *   버튼에 transform 을 직접 건드리는 키프레임을 다시 붙이지 말 것. */
+@keyframes s10-btn-in {
+  0%   { opacity: 0; translate: 0 40px; scale: .92; }
+  100% { opacity: 1; translate: 0 0; scale: 1; }
+}
 .s10-pack {
   transform-box: fill-box;
   transform-origin: 50% 100%;
@@ -310,7 +567,7 @@ html, body {
   border-radius: 2.2cqh;
   box-shadow: 0 0.8cqh 2cqh rgba(24, 90, 74, 0.32);
   cursor: pointer;
-  animation: s10-pack 800ms 400ms cubic-bezier(.2, .9, .3, 1.15) both;
+  animation: s10-btn-in 800ms 400ms cubic-bezier(.2, .9, .3, 1.15) both;
 }
 /* 종료 후에는 입력을 받지 않는다 */
 html[data-state="ended"] #scene-layer { pointer-events: none; }
@@ -439,4 +696,240 @@ html[data-state="ended"] #scene-layer { pointer-events: none; }
 @keyframes rw-pulse {
   0%, 100% { box-shadow: 0 0.8cqh 2cqh rgba(24, 90, 74, 0.32); }
   50% { box-shadow: 0 0.8cqh 3.4cqh rgba(47, 169, 140, 0.62); }
+}
+
+/* ----------------------------------------------------------
+ * 05. 공통 장면 연출 보강 (1·2·3·4·10)
+ *
+ * 왜 공통 장면에만 넣나
+ *   watch·intervene 이 같이 보는 구간이라 여기를 아무리 올려도 조건 간 각성 차이가
+ *   안 생긴다. intervene 전용 구간(5~9)에 같은 만큼 올리면 개입 조건만 화려해져
+ *   노출 시간 비대칭 위에 각성 비대칭이 얹힌다 (motion.test.js 규칙 D).
+ *
+ * 규율은 앞 절과 같다
+ *   · 전부 .cam 아래에 둔다 → ?still 스토리보드 캡처는 정지 상태로 남는다
+ *   · 조건·버전 판별자를 쓰지 않는다 → 참가자마다 다른 화면이 안 나온다
+ *   · blur 를 쓰지 않는다 → 기기 성능에 따라 프레임이 튀지 않는다
+ *   · prefers-reduced-motion 오버라이드를 두지 않는다 → 자극 동일성
+ *
+ * 장면 10 의 [지금 구매하기] 버튼에는 아무것도 걸지 않는다.
+ * 그 클릭이 종속변인(CTA_CLICK)이라, 버튼을 맥동시키면 그 연출이 클릭률로 들어온다.
+ * ---------------------------------------------------------- */
+
+/* 1. 장면 1 — 손에 든 두 벌이 살랑거린다.
+ *
+ * 인물은 머리를 좌우로 돌리며 망설이는데 정작 들고 있는 옷은 못 박힌 듯 붙어 있었다.
+ * 두 벌을 서로 어긋난 위상으로 흔들어 "들고 있다"는 느낌을 만든다. 짙은 옷이 먼저
+ * 움직이고 밝은 옷이 뒤따른다 — 시선이 왼쪽에서 오른쪽으로 흐른다.
+ *
+ * 폭은 회전 1.2도 · 이동 3px 안쪽이다. 이보다 크면 옷이 바람에 날리는 화면이 되고,
+ * "빨래를 고르는 중"이 아니라 "야외"로 읽힌다. */
+@keyframes s1-sway-l {
+  0%   { translate: 0 0; rotate: -.5deg; }
+  38%  { translate: 2px -3px; rotate: 1.2deg; }
+  72%  { translate: -1px 1px; rotate: -.7deg; }
+  100% { translate: 1px -1px; rotate: .4deg; }
+}
+@keyframes s1-sway-d {
+  0%   { translate: 0 0; rotate: .6deg; }
+  30%  { translate: -2px -2px; rotate: -1.1deg; }
+  66%  { translate: 1px 2px; rotate: .8deg; }
+  100% { translate: -1px 0; rotate: -.3deg; }
+}
+.sc1 .cam .s1-hold { transform-box: fill-box; transform-origin: 50% 8%; }   /* 손에 닿는 윗변 */
+.sc1 .cam .s1-hold-l { animation: s1-sway-l 4s ease-in-out both; }
+.sc1 .cam .s1-hold-d { animation: s1-sway-d 4s ease-in-out both; }
+
+/* 2. 장면 2 — 자막이 "그대로 세탁 시작"인데 아무것도 시작하지 않았다.
+ *
+ * 옷이 들어가고(s2-toss 가 1.4s+3.2s 에 끝난다) 문이 닫히고 표시등이 켜진다.
+ * 그래야 다음 컷(드럼이 도는 장면 3)이 "그래서 돌기 시작했다"로 이어진다.
+ * 문 닫힘은 4.5s — 옷이 사라진 직후이고, 5초 장면이 끝나기 0.5초 전이다.
+ *
+ * ?still=2 는 열린 문만 그린다(scenes.js s2). 여기서 겹쳐 두는 것은 재생 전용이다. */
+@keyframes s2-door-shut {
+  0%, 88%   { opacity: 1; }
+  92%, 100% { opacity: 0; }
+}
+@keyframes s2-door-seal {
+  0%, 88%   { opacity: 0; scale: 1.04; }
+  96%       { opacity: 1; scale: .995; }
+  100%      { opacity: 1; scale: 1; }
+}
+.sc2 .cam .door-open { animation: s2-door-shut 5s linear both; }
+.sc2 .cam .door-closed {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: s2-door-seal 5s cubic-bezier(.3, 0, .2, 1) both;
+}
+/* 다이얼을 한 칸 돌리고 표시등이 들어온다 — "코스를 골라 눌렀다" */
+@keyframes s2-dial {
+  0%, 84%  { rotate: 0deg; }
+  93%      { rotate: 62deg; }
+  100%     { rotate: 58deg; }
+}
+@keyframes s2-led-on {
+  0%, 90%  { opacity: .35; }
+  95%      { opacity: 1; }
+  100%     { opacity: .9; }
+}
+.sc2 .cam .w-dial {
+  transform-box: fill-box;
+  transform-origin: 50% 62%;           /* 손잡이 축 */
+  animation: s2-dial 5s cubic-bezier(.2, 1.4, .4, 1) both;
+}
+.sc2 .cam .w-led-a { animation: s2-led-on 5s linear both; }
+
+/* 3. 장면 3 — 6초 동안 카메라가 한 번도 안 움직인 유일한 공통 장면이었다.
+ *
+ * 드럼은 정지 → 최고 → 정지로 3.2바퀴 돈다(s3-ramp). 카메라와 진동을 **같은 곡선**에
+ * 얹어, 드럼이 가장 빠를 때 화면이 가장 조여지고 가장 떨리게 한다. 세 가지가 따로
+ * 놀면 화면이 산만해지고, 같이 가면 하나의 가속으로 읽힌다.
+ *
+ * 진동은 기계 몸통(.drum-body)에만 건다. 방 배경까지 떨면 기계가 흔들리는 것이
+ * 아니라 카메라가 흔들린 것으로 읽히고, 그건 이 장면이 말하려는 것이 아니다.
+ * 폭은 1080 기준 ±2.5px — 휴대폰에서 겨우 느껴지는 정도다. 이보다 키우면
+ * 세탁기가 고장 난 화면이 되어 "실패 원인은 시트 미사용 하나"라는 전제가 흐려진다. */
+@keyframes cam-push3 {
+  0%   { transform: translate(0px, 0px) scale(1); animation-timing-function: cubic-bezier(.4, 0, .5, 1); }
+  50%  { transform: translate(-27px, -50px) scale(1.10); animation-timing-function: cubic-bezier(.5, 0, .6, 1); }
+  100% { transform: translate(-32px, -60px) scale(1.12); }
+}
+.sc3 .cam { animation: cam-push3 6s both; }
+
+@keyframes s3-shudder {
+  0%, 100% { translate: 0 0; }
+  20%  { translate: .6px -.5px; }
+  30%  { translate: -1.4px .9px; }
+  40%  { translate: 1.9px 1.2px; }
+  46%  { translate: -2.3px -1.4px; }
+  52%  { translate: 2.5px .8px; }
+  58%  { translate: -2.1px 1.5px; }
+  66%  { translate: 1.6px -1.1px; }
+  76%  { translate: -.9px .6px; }
+  88%  { translate: .4px -.3px; }
+}
+.sc3 .cam .drum-body {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: s3-shudder 6s linear both;
+}
+
+/* 4. 장면 4 — 카메라가 얼룩으로 다가가는 8초 동안 인물은 어깨만 내려앉았다.
+ *
+ * 두 가지를 더한다.
+ *   ① 옷을 들어 올린 팔이 얼룩을 확인하려 옷을 살짝 당겼다 놓는다(1.6초 근처).
+ *      카메라가 밀고 들어오는 시점(cam-push4 의 16~50%)과 겹쳐야 "다가가 보니
+ *      물들었다"가 된다.
+ *   ② 그 직후 고개를 아주 느리게 가로젓는다. 믿기지 않는다는 반응이고,
+ *      SPEC 2장의 "인물을 무능하게 묘사하지 않는다"에 걸리지 않는 선이다 —
+ *      자책이 아니라 확인이다.
+ *
+ * 장면 4 는 watch·intervene 이 함께 보는 마지막 장면이고 이 광고의 전환점이다. */
+@keyframes s4-garment-check {
+  0%, 14%  { translate: 0 0; rotate: 0deg; }
+  24%      { translate: -4px -9px; rotate: -1.4deg; }   /* 눈앞으로 당긴다 */
+  38%      { translate: -1px -3px; rotate: .6deg; }
+  60%      { translate: 1px 4px; rotate: -.4deg; }      /* 힘이 빠져 내려온다 */
+  100%     { translate: 2px 7px; rotate: -.8deg; }
+}
+.sc4 .cam .hold-garment {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;            /* 손에 잡힌 윗변 */
+  animation: s4-garment-check 8s cubic-bezier(.35, 0, .3, 1) both;
+}
+@keyframes s4-head-deny {
+  0%, 40%  { rotate: 0deg; }
+  52%      { rotate: -5deg; }
+  64%      { rotate: 4deg; }
+  76%      { rotate: -2.5deg; }
+  100%     { rotate: -1deg; }
+}
+.sc4 .cam .person .head {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;          /* 목 */
+  animation: s4-head-deny 8s cubic-bezier(.4, 0, .35, 1) both;
+}
+
+/* 10. 장면 10 — 카메라가 물러나는 동안 팩샷만 움직이고 글자는 그냥 거기 있었다.
+ *
+ * 이름 → 밑줄 → 부제 → 면책 순으로 자리를 잡는다. 카메라가 멈추는 3.5초 안에
+ * 전부 끝나서, 남은 4.5초는 화면 전체가 완전히 고정된다 — CTA 를 누르는 구간에
+ * 움직이는 것이 하나도 없어야 한다.
+ *
+ * 밑줄은 가운데에서 좌우로 그어진다. 브랜드 이름 아래를 긋는 동작이라 시선이
+ * 이름에서 부제로 내려가는 길을 만든다. */
+@keyframes s10-rise {
+  0%   { opacity: 0; translate: 0 26px; }
+  100% { opacity: 1; translate: 0 0; }
+}
+@keyframes s10-rule-draw {
+  0%   { scale: 0 1; opacity: 0; }
+  100% { scale: 1 1; opacity: 1; }
+}
+.sc10 .cam .s10-name,
+.sc10 .cam .s10-sub,
+.sc10 .cam .s10-note {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+}
+.sc10 .cam .s10-name { animation: s10-rise 620ms 700ms cubic-bezier(.16, .9, .3, 1) both; }
+.sc10 .cam .s10-rule {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: s10-rule-draw 520ms 1180ms cubic-bezier(.2, .8, .3, 1) both;
+}
+.sc10 .cam .s10-sub  { animation: s10-rise 620ms 1420ms cubic-bezier(.16, .9, .3, 1) both; }
+.sc10 .cam .s10-note { animation: s10-rise 620ms 2200ms cubic-bezier(.16, .9, .3, 1) both; }
+
+/* ---- 광고 닫기 [×] (장면 10) ----
+ *
+ * 왜 두나
+ *   나가는 길이 [지금 구매하기] 하나뿐이면 그 클릭이 "사고 싶다"가 아니라
+ *   "나가려면 이것밖에 없다"가 된다. CTA_CLICK 이 종속변인이라 이건 측정 문제고,
+ *   실제 광고에는 늘 있는 것이라 없으면 오히려 광고답지 않다.
+ *
+ * CTA 와 같은 순간에 같은 방식으로 등장한다
+ *   .cta 에는 예전부터 등장 애니메이션(s10-pack)이 걸려 있었다. 닫기만 가만히
+ *   놓여 있으면 CTA 가 먼저 눈에 들어와 그 차이가 클릭률로 들어온다. 그래서
+ *   **같은 애니메이션·같은 지연**을 쓴다. 둘 중 하나에만 손대지 말 것.
+ *
+ * 크기·자리는 실제 광고의 관행을 따른다
+ *   오른쪽 위, 손가락이 닿는 최소 크기(약 44px). 게임 자극의 같은 버튼과
+ *   cq 값을 맞춘다 — 한쪽이 크거나 눈에 잘 띄면 그 차이가 두 자극의
+ *   CTA_CLICK 비교에 그대로 들어온다.
+ *
+ * 맥동시키지 않는다
+ *   [되돌리기]는 맥동한다(그쪽은 진행 조건이라 안 누르면 광고가 안 끝난다).
+ *   여기 둘은 **둘 다 종속변인**이라 어느 쪽도 부추기면 안 된다.
+ */
+.ad-close {
+  position: absolute;
+  top: 2.4cqh;
+  right: 3.2cqw;
+  width: 7.2cqh;
+  height: 7.2cqh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: #35414D;
+  background: rgba(255, 255, 255, 0.82);
+  border: 0.35cqh solid rgba(53, 65, 77, 0.18);
+  border-radius: 50%;
+  cursor: pointer;
+  animation: s10-btn-in 800ms 400ms cubic-bezier(.2, .9, .3, 1.15) both;
+}
+.ad-close svg {
+  width: 58%;
+  height: 58%;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  fill: none;
+}
+.ad-close:disabled { cursor: default; }
+.ad-close.is-pressed {
+  background: rgba(228, 232, 236, 0.95);
+  transform: scale(0.94);
 }

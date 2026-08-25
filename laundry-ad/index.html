@@ -48,6 +48,13 @@
   <!-- 효과음이 먼저 로드돼야 scenes.js 가 window.AD_SFX 를 잡는다.
        빠지더라도 자극은 무음으로 그대로 돌아간다(scenes.js 에 무음 대역이 있다). -->
   <script src="sfx.js"></script>
+
+  <!-- 나래이션. 자막을 그대로 읽는다. voice-clips.js 는 생성물이고
+       (tools/build-voice.py) voice.js 가 재생을 맡는다. 둘 다 빠져도
+       자극은 목소리 없이 그대로 돌아간다 — 자막이 같은 정보를 들고 있다. -->
+  <script src="voice-clips.js"></script>
+  <script src="voice.js"></script>
+
   <script src="scenes.js"></script>
 </body>
 </html>

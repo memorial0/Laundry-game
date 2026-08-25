@@ -74,6 +74,21 @@ module.exports = async function () {
     const hidden = (css.match(/\.sc6\.is-watch[^{]*\{[^}]*display:\s*none[^}]*\}/g) || []).join(' ');
     const leak = UI.filter(sel => !new RegExp('\\.sc6\\.is-watch\\s+\\' + sel + '\\b').test(hidden));
     t.ok(leak.length === 0, 'is-watch에서는 조작 안내 UI 비표시', leak.length ? leak : undefined);
+
+    /* 규칙이 있는 것과 규칙이 걸리는 것은 다르다. 위 검사는 CSS 만 봐서, 정작
+     * is-watch 를 붙이는 곳이 없던 동안에도 통과했다 — ?still=6 스토리보드에는
+     * intervene 전용 UI 가 그대로 찍히고 있었다. 이제 클래스가 실제로 붙는지 본다. */
+    const sw = bootPage('?mode=watch&still=6');
+    await wait(120);
+    const swEl = sw.document.querySelector('.sc6');
+    t.ok(!!swEl && swEl.classList.contains('is-watch'),
+      '?still=6 · watch 에 is-watch 가 붙는다', swEl && swEl.className);
+
+    const si = bootPage('?mode=intervene&still=6');
+    await wait(120);
+    const siEl = si.document.querySelector('.sc6');
+    t.ok(!!siEl && !siEl.classList.contains('is-watch'),
+      '?still=6 · intervene 에는 안 붙는다', siEl && siEl.className);
   }
 
   t.section('동작 줄이기');
@@ -115,12 +130,18 @@ module.exports = async function () {
   t.ok(js.includes('세탁 조건에 따라 효과는 달라질 수 있습니다'), '팩샷 면책 문구');
   t.ok(js.includes('기능 설명 화면'), '장면 7 설명용 시각화 라벨');
 
-  /* 효과음도 합성이라 오디오 파일이 없다 — 여기 포함해 오프라인 조건을 같이 지킨다 */
+  /* 효과음도 합성이고 나래이션은 base64 로 심겨 있어 오디오 파일이 없다 —
+   * 여기 포함해 오프라인 조건을 같이 지킨다. voice-clips.js 는 생성물이지만
+   * 배포되는 파일이므로 같은 검사를 받는다. */
   const sfx = fs.readFileSync(path.join(APP_DIR, 'sfx.js'), 'utf8');
+  const voice = fs.readFileSync(path.join(APP_DIR, 'voice.js'), 'utf8');
+  const clips = fs.readFileSync(path.join(APP_DIR, 'voice-clips.js'), 'utf8');
   const external = /https?:\/\/(?!www\.w3\.org)/;
-  t.ok(!external.test(js) && !external.test(html) && !external.test(css) && !external.test(sfx),
+  t.ok(!external.test(js) && !external.test(html) && !external.test(css) &&
+    !external.test(sfx) && !external.test(voice) && !external.test(clips),
     '외부 요청 없음(오프라인 실행)');
-  t.ok(!/<script[^>]+src="(?!(sfx|scenes)\.js")/.test(html), '자체 스크립트 둘 외에는 없음');
+  t.ok(!/<script[^>]+src="(?!(sfx|voice-clips|voice|scenes)\.js")/.test(html),
+    '자체 스크립트 넷 외에는 없음');
   t.ok(!/@import|url\(['"]?https?:/.test(css), '외부 폰트·리소스 없음');
 
   return t.failed;

@@ -14,10 +14,14 @@ const APP_DIR = path.resolve(__dirname, '../..');
 const HTML = fs.readFileSync(path.join(APP_DIR, 'index.html'), 'utf8');
 const JS = fs.readFileSync(path.join(APP_DIR, 'scenes.js'), 'utf8');
 const SFX = fs.readFileSync(path.join(APP_DIR, 'sfx.js'), 'utf8');
+const CLIPS = fs.readFileSync(path.join(APP_DIR, 'voice-clips.js'), 'utf8');
+const VOICE = fs.readFileSync(path.join(APP_DIR, 'voice.js'), 'utf8');
 
 /* jsdom 은 외부 <script src> 를 가져오지 않는다. 태그를 지우고 아래에서 직접 주입한다.
- * 순서는 실제 페이지와 같아야 한다 — sfx.js 가 먼저다. */
-const STRIP = /<script src="(sfx|scenes)\.js"><\/script>/g;
+ * 순서는 실제 페이지와 같아야 한다 — 소리(sfx) · 나래이션 클립 · 나래이션 · 자극.
+ * 나래이션까지 넣는 이유: 넣지 않으면 scenes.js 가 무음 대역을 잡아, 참가자가
+ * 실제로 돌리는 경로가 아니라 목소리가 없는 경로만 검사하게 된다. */
+const STRIP = /<script src="(sfx|voice-clips|voice|scenes)\.js"><\/script>/g;
 
 /** 실제 페이지를 띄운다. window.__messages 에 postMessage 수신분이 쌓인다. */
 function bootPage(query) {
@@ -34,7 +38,7 @@ function bootPage(query) {
 
   /* jsdom 에는 AudioContext 가 없다 — sfx.js 는 무음으로 떨어지고 AUDIO_OK 는 null 이 된다.
    * 여기서 검사하는 것은 "소리가 나느냐"가 아니라 "소리 코드가 자극을 멈추지 않느냐"다. */
-  [SFX, JS].forEach(src => {
+  [SFX, CLIPS, VOICE, JS].forEach(src => {
     const s = window.document.createElement('script');
     s.textContent = src;
     window.document.body.appendChild(s);

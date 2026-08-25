@@ -105,6 +105,48 @@ function audibleGain(bedSrc) {
   return Math.round(sum * 100) / 100;
 }
 
+/**
+ * 큐 음색이 "작은 스피커에서 살아남는가".
+ *
+ * 배경음에는 이미 같은 잣대를 대고 있었는데(audibleGain) 큐에는 없었다. 그 틈으로
+ * 세탁 쪽 fail 이 순수 sine 190 → 72Hz 로 들어가 있었다 — 휴대폰에서는 거의 안 들려서,
+ * CUES 가 정해 둔 beat < bad < fail 세기 순서가 기기에서는 뒤집혀 있었다.
+ *
+ * 파형에 따라 남는 것이 다르다. sine 은 배음이 없어 기본음이 잘리면 끝이고,
+ * triangle·square·sawtooth 는 배음이 위로 뻗어 기본음이 잘려도 소리가 남는다
+ * (사람은 그 배음들로 원래 음높이를 듣는다 — 결여 기본음).
+ *
+ * 정확한 음량 계산이 아니라 "저역에만 있는 신호"를 잡아내는 거친 자다.
+ */
+const SMALL_SPEAKER_CUT = 200;   // Hz — 이 아래는 없는 것으로 친다
+
+function layerSurvives(chunk) {
+  const num = re => { const m = re.exec(chunk); return m ? parseFloat(m[1]) : null; };
+  const f0 = num(/\bf0:\s*([0-9.]+)/);
+  if (f0 === null) return true;                       // 주파수가 없는 레이어는 판단 대상 아님
+  const f1 = num(/\bf1:\s*([0-9.]+)/);
+  const geo = f1 ? Math.sqrt(f0 * f1) : f0;           // 훑는 소리는 기하평균으로 대표한다
+  if (/noise:\s*true/.test(chunk)) {
+    return (/'lowpass'/.test(chunk) ? geo / 2 : geo) >= SMALL_SPEAKER_CUT;
+  }
+  if (/wave:\s*'sine'/.test(chunk)) return geo >= SMALL_SPEAKER_CUT;
+  return geo * 3 >= SMALL_SPEAKER_CUT;                // 배음이 있는 파형
+}
+
+/** 신호 이름 → 살아남는 레이어가 하나라도 있는가 */
+function cueSurvival(src) {
+  const at = src.indexOf('var VOICES = {');
+  const body = src.slice(at, src.indexOf('\n  };', at));
+  const out = {};
+  const re = /^ {4}(\w+): \[([\s\S]*?)^ {4}\]/gm;
+  let m;
+  while ((m = re.exec(body))) {
+    const layers = m[2].split(/\n\s*\{\s/).slice(1);
+    out[m[1]] = layers.some(layerSurvives);
+  }
+  return out;
+}
+
 module.exports = async function () {
   const t = suite('효과음 · 두 자극 규격 일치');
 
@@ -151,6 +193,17 @@ module.exports = async function () {
     { 배경음: bedGain, 최소큐: minCue });
   /* 음색은 달라야 한다 — 자극별 배경음을 쓰기로 한 결정이다(INTEGRATION.md §3). */
   t.ok(lb !== gb, '배경음 음색은 자극마다 다르다 (의도된 차이)');
+
+  t.section('큐 음색도 작은 스피커에서 살아남는다');
+  {
+    /* 두 자극 모두에 같은 잣대를 댄다 — 한쪽만 검사하면 그 자체가 비대칭이 된다. */
+    for (const [name, src] of [['세탁', L], ['게임', G]]) {
+      const surv = cueSurvival(src);
+      const dead = Object.keys(surv).filter(k => !surv[k]);
+      t.ok(dead.length === 0, name + ' — 모든 큐에 200Hz 위로 남는 성분이 있다',
+        dead.length ? dead : undefined);
+    }
+  }
   t.ok(/startBed/.test(lc || '') && /stopBed/.test(lc || ''),
     '켜고 끄는 절차가 코어에 있다');
   /* 반복 악절(시퀀서)도 코어에 있어야 한다. 한쪽 자극에만 두면 빠르기·박자 정확도가

@@ -566,9 +566,11 @@ const MicrogateExperiment = () => {
     setStage(STAGES.ENDED);
   }, []);
 
-  /* 8초 자동 종료. CTA 를 누르면 아래 onCta 가 먼저 닫는다. */
+  /* 8초 자동 종료. CTA·[×] 를 누르면 아래 onCta·onClose 가 먼저 닫는다. */
+  const cardShownAt = useRef(0);
   useEffect(() => {
     if (gamePhase !== 'product_card') return undefined;
+    cardShownAt.current = Date.now();
     SFX.play('card');   // 세탁 자극의 장면 10 진입과 같은 자리다
     const id = setTimeout(() => closeCard(), PRODUCT_CARD_SEC * 1000);
     return () => clearTimeout(id);
@@ -587,9 +589,26 @@ const MicrogateExperiment = () => {
   const onCta = useCallback(() => {
     if (cardClosed.current) return;
     LOG.CTA_CLICK = 1;
+    LOG.T_CARD = secondsSince(cardShownAt.current);
     /* 종료(=로그 마감) 전에 울려야 SFX_COUNT 에 이 클릭이 포함된다.
      * 이 클릭음은 세탁 자극과 음색까지 같다 — sfx.js 의 CTA_VOICE. */
     SFX.play('cta');
+    closeCard(Date.now());
+  }, [closeCard]);
+
+  /** 카드 오른쪽 위 [×] — 세탁 자극의 같은 버튼과 짝이다(INTEGRATION.md §5-13).
+   *
+   *  나가는 길이 [지금 다운로드] 하나뿐이면 그 클릭이 "받고 싶다"가 아니라
+   *  "나가려면 이것밖에 없다"가 된다. CTA_CLICK 이 종속변인이라 이건 측정 문제고,
+   *  실제 광고에는 늘 있는 것이라 없으면 오히려 광고답지 않다.
+   *
+   *  닫기는 가장 작은 신호(beat)로 받는다. 소리를 안 내면 CTA 만 청각 보상을
+   *  갖게 되어 그 자체가 CTA 쪽으로 미는 힘이 된다 — 세탁 쪽과 같은 규칙이다. */
+  const onClose = useCallback(() => {
+    if (cardClosed.current) return;
+    LOG.CLOSE_CLICK = 1;
+    LOG.T_CARD = secondsSince(cardShownAt.current);
+    SFX.play('beat');
     closeCard(Date.now());
   }, [closeCard]);
 
@@ -1193,6 +1212,11 @@ const MicrogateExperiment = () => {
                 <div className="pc-rule" />
                 <p className="pc-genre">{APP.genre}</p>
                 <p className="pc-msg">{APP.message}</p>
+                <button type="button" className="ad-close" aria-label="광고 닫기" onClick={onClose}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M7 7 L17 17 M17 7 L7 17" />
+                  </svg>
+                </button>
                 <button type="button" className="cta" onClick={onCta}>{APP.cta}</button>
                 <p className="pc-note">{APP.note}</p>
               </div>

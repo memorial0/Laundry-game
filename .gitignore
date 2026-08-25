@@ -4,3 +4,7 @@ dist/
 *.local
 .env
 .build/
+
+# 스토리보드 추출물 — npm run storyboard 가 만든다 (IRB 별첨용, 1.9MB)
+laundry-ad/test/out/
+__pycache__/
