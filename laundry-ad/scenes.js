@@ -168,12 +168,18 @@
       '</defs>';
   };
 
+  /* 카메라 — 장면 내용을 <g class="cam">으로 감싼다. 뷰박스는 10장면이 모두 같고
+   * (1080x1920 고정) 화면 이동은 이 그룹의 CSS transform 하나로만 일어난다.
+   * 정지 화면(?still)에서는 클래스 이름을 바꿔 카메라 규칙이 아예 안 걸리게 한다 —
+   * 스토리보드 캡처는 움직이면 안 되고, 소품 애니메이션을 anim()으로 끄는 것과 같은 취지다. */
   ART.svg = function (inner, cls, html) {
     var el = document.createElement('div');
     el.className = 'scene ' + (cls || '');
     el.innerHTML =
       '<svg class="scene-svg" viewBox="0 0 1080 1920" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' +
-      ART.defs() + inner + '</svg>' + (html || '');
+      ART.defs() +
+      '<g class="' + (CFG.still === null ? 'cam' : 'cam-still') + '">' + inner + '</g>' +
+      '</svg>' + (html || '');
     return el;
   };
 
@@ -386,7 +392,9 @@
       '<rect x="-96" y="-548" width="192" height="308" rx="54" fill="' + PAL.wear + '"/>' +
       '<path d="M-96,-420 q96,34 192,0 v146 q0,34 -34,34 h-124 q-34,0 -34,-34 Z" fill="' + PAL.wearLo + '" opacity=".45"/>' +
       '<path d="M-40,-548 q40,44 80,0" fill="none" stroke="' + PAL.wearLo + '" stroke-width="8"/>' +
-      // 목 · 머리
+      /* 목 · 머리 — 따로 묶는다. 머리만 돌려야 "무엇을 보고 있는지"가 생긴다.
+       * 그림은 그대로고 <g> 하나만 더 생기므로 조건·버전 모두 같은 마크업이다. */
+      '<g class="head">' +
       '<rect x="-24" y="-588" width="48" height="48" rx="10" fill="' + PAL.skin + '"/>' +
       '<path d="M-24,-568 q24,22 48,0 v-20 h-48 Z" fill="' + PAL.skinEdge + '" opacity=".55"/>' +
       '<circle cx="0" cy="-642" r="70" fill="' + PAL.skin + '" stroke="' + PAL.skinEdge + '" stroke-width="4"/>' +
@@ -399,7 +407,10 @@
       '<circle cx="25" cy="-638" r="8" fill="' + PAL.ink + '"/>' +
       '<circle cx="-22" cy="-641" r="3" fill="#fff"/>' +
       '<circle cx="28" cy="-641" r="3" fill="#fff"/>' +
-      blush + brow + mouth + (o.arms || '') +
+      blush + brow + mouth +
+      '</g>' +
+      // 팔도 따로 묶는다 — 던지는 동작의 뒤따름을 팔에만 줄 수 있어야 한다
+      '<g class="arms">' + (o.arms || '') + '</g>' +
       '</g>';
   };
 
@@ -869,7 +880,7 @@
     {
       no: 1,
       title: '목표',
-      dur: 5,
+      dur: 4,
       subtitle: function () {
         return '내일 ' + V.light.use + ' ' + V.light.name + ', 오늘 같이 빨래하기';
       },
@@ -894,7 +905,7 @@
     {
       no: 4,
       title: '실패 결과',
-      dur: 7,
+      dur: 8,
       sfx: 'fail',
       subtitle: function () { return V.light.name + ' 색이 변해 버렸다'; },
       render: function () { return ART.svg(ART.s4({ still: CFG.still !== null }), 'sc4'); }
@@ -959,6 +970,10 @@
       render: function (ctx) {
         var el = ART.svg(ART.s6({ still: CFG.still !== null }), 'sc6');
         if (CFG.still === null) Scene6.attach(el, ctx);
+        /* 정지 화면에서도 watch 는 조작 UI 가 꺼져 있어야 한다. attach 가 재생에서만
+         * 돌기 때문에 여태 ?still=6 스토리보드에는 intervene 전용 UI 가 그대로 찍혔다.
+         * 표시를 끄는 CSS 는 이미 있었고, 그걸 켜 줄 클래스만 없었다. */
+        else if (CFG.mode !== MODES.INTERVENE) el.classList.add('is-watch');
         return el;
       }
     },

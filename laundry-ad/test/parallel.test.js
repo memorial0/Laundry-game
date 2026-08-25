@@ -74,6 +74,21 @@ module.exports = async function () {
     const hidden = (css.match(/\.sc6\.is-watch[^{]*\{[^}]*display:\s*none[^}]*\}/g) || []).join(' ');
     const leak = UI.filter(sel => !new RegExp('\\.sc6\\.is-watch\\s+\\' + sel + '\\b').test(hidden));
     t.ok(leak.length === 0, 'is-watch에서는 조작 안내 UI 비표시', leak.length ? leak : undefined);
+
+    /* 규칙이 있는 것과 규칙이 걸리는 것은 다르다. 위 검사는 CSS 만 봐서, 정작
+     * is-watch 를 붙이는 곳이 없던 동안에도 통과했다 — ?still=6 스토리보드에는
+     * intervene 전용 UI 가 그대로 찍히고 있었다. 이제 클래스가 실제로 붙는지 본다. */
+    const sw = bootPage('?mode=watch&still=6');
+    await wait(120);
+    const swEl = sw.document.querySelector('.sc6');
+    t.ok(!!swEl && swEl.classList.contains('is-watch'),
+      '?still=6 · watch 에 is-watch 가 붙는다', swEl && swEl.className);
+
+    const si = bootPage('?mode=intervene&still=6');
+    await wait(120);
+    const siEl = si.document.querySelector('.sc6');
+    t.ok(!!siEl && !siEl.classList.contains('is-watch'),
+      '?still=6 · intervene 에는 안 붙는다', siEl && siEl.className);
   }
 
   t.section('동작 줄이기');

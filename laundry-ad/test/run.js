@@ -2,7 +2,7 @@
 /* 전체 테스트 실행:  npm test   (또는  node test/run.js [이름] ) */
 'use strict';
 
-const SUITES = ['render', 'engine', 'scene6', 'log', 'parallel', 'sfx'];
+const SUITES = ['render', 'engine', 'scene6', 'log', 'parallel', 'motion', 'sfx'];
 
 (async () => {
   const only = process.argv[2];
