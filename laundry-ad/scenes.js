@@ -177,7 +177,10 @@
   var PAL = {
     // 세탁실
     wall: '#E7EEF4', wallLo: '#D8E3EC', wallHi: '#F3F8FB',
-    floor: '#EBE4D8', floorLo: '#DCD3C3', base: '#CBC1AE',
+    /* base 는 걸레받이·선반에 쓰는 가장 어두운 배경 값이다. 화면 전체가 옅은
+     * 민트·흰색·베이지라 **눈이 붙잡을 어두운 자리가 하나도 없었다.** 걸레받이는
+     * 모든 방 장면을 가로지르는 띠라 여기를 눌러 주면 화면에 가로 기준선이 생긴다. */
+    floor: '#EBE4D8', floorLo: '#D6C9B2', base: '#B0A187',
     // 세탁기
     body: '#FFFFFF', bodyLo: '#E4EBF2', panel: '#EEF3F8', edge: '#C4CFDB',
     ring: '#B6C3D1', ringLo: '#93A2B4', door: '#DCE5EE', glass: '#8FA3B8', opening: '#3D4A5C',
@@ -198,7 +201,7 @@
   // ver B: 소재 외에 인물 옷 색상·배경 색조만 다르다 (구도·길이·정보량 동일)
   if (CFG.ver === 'B') {
     PAL.wall = '#F2ECE4'; PAL.wallLo = '#E6DCD0'; PAL.wallHi = '#FBF7F1';
-    PAL.floor = '#D6DBE0'; PAL.floorLo = '#C4CBD2'; PAL.base = '#B7BFC7';
+    PAL.floor = '#D6DBE0'; PAL.floorLo = '#B8C0CA'; PAL.base = '#99A5B3';
     PAL.wear = '#C08466'; PAL.wearLo = '#A56C51';
     PAL.light = '#FFFCF6'; PAL.lightEdge = '#DDCDB2'; PAL.lightShade = '#F5EBDA';
   }
@@ -872,8 +875,21 @@
 
   // 6. 수정 행동 — watch/intervene가 같은 그림을 쓰고 "수행 주체"만 다르다
   ART.S6 = {
-    HOME: { x: 270, y: 1530 },
-    DROP: { x: 790, y: 1180 },
+    /* 시트 시작 위치와 투입구 — **화면 좌표**다. 포인터는 getScreenCTM 으로 뷰박스
+     * 좌표로 바뀌므로 여기 값이 곧 참가자가 만지는 자리다.
+     *
+     * 예전에는 시트가 (270,1530) 왼쪽 아래 구석, 투입구가 (790,1180) 오른쪽이었고
+     * 세탁기가 작아 **화면의 절반 이상이 빈 벽과 바닥**이었다. 개입 조건 참가자가
+     * 실제로 조작하는 유일한 장면인데 정작 조작할 것들이 구석에 몰려 있었다.
+     * 방·세탁기를 1.5배로 키워 앉히고(ART.s6) 두 자리를 화면 가운데로 끌어왔다.
+     *
+     * 끄는 거리는 627 → 675 로 8% 늘었다. 드롭 판정 반경(HIT)과 시트 크기는 그대로라
+     * 조작 난이도 자체는 바뀌지 않는다. T_MANIP 을 예전 값과 직접 비교하지 말 것. */
+    HOME: { x: 300, y: 1500 },
+    DROP: { x: 600, y: 880 },
+    /* 방·세탁기를 키우는 배율. 시트·투입구는 이 변환 밖에서 화면 좌표로 그린다 —
+     * 안에 넣으면 포인터 좌표와 어긋나 드래그가 빗나간다. */
+    ROOM_SCALE: 1.5,
     HIT: 190,
     IDLE_MS: 8000,
     WATCH_MS: WATCH_S6_MS   // watch 재생 길이 — 조정은 WATCH_S6_MS 한 곳에서
@@ -882,8 +898,11 @@
   ART.s6 = function (o) {
     o = o || {};
     var S = ART.S6;
+    /* 안내선은 두 자리 사이를 잇는다. 예전에는 휘는 지점이 숫자로 박혀 있어(Q560,1300)
+     * 자리를 옮기면 선이 엉뚱한 데로 휘었다. 두 점에서 계산한다. */
+    var qx = (S.HOME.x + S.DROP.x) / 2 - 40, qy = (S.HOME.y + S.DROP.y) / 2 + 60;
     var guide = '<path class="s6-guide" d="M' + (S.HOME.x + 90) + ',' + (S.HOME.y - 70) +
-      ' Q560,1300 ' + (S.DROP.x - 130) + ',' + (S.DROP.y + 40) + '"' +
+      ' Q' + qx.toFixed(0) + ',' + qy.toFixed(0) + ' ' + (S.DROP.x - 130) + ',' + (S.DROP.y + 40) + '"' +
       ' fill="none" stroke="' + PAL.brand + '" stroke-width="10" stroke-dasharray="22 22" stroke-linecap="round" opacity=".45"/>';
     var ring = '<g class="s6-ring">' +
       '<circle cx="' + S.DROP.x + '" cy="' + S.DROP.y + '" r="170" fill="' + PAL.brand + '" opacity=".12"/>' +
@@ -898,7 +917,16 @@
       '</g>';
     var hand = '<g class="s6-hand">' + ART.hand() + '</g>' +
       '<g class="s6-grip">' + ART.handGrip() + '</g>';
-    return ART.room() + ART.washer({ both: true }) + ring + guide + sheet + hand;
+    /* 방과 세탁기만 키운다. 투입구(DROP)가 커진 세탁기의 문 자리에 오도록 옮긴다 —
+     * 원본에서 문은 (790,1180) 이므로 그 점이 DROP 으로 가는 평행이동을 구한다. */
+    var RS = S.ROOM_SCALE;
+    /* 키운 방은 화면을 다 못 덮는다(옮긴 만큼 한쪽이 비어 벽지가 끊긴다).
+     * 뒤에 벽 한 장을 깔아 둔다 — 이게 없으면 프레임 가장자리가 투명하게 남는다. */
+    var room = '<rect x="0" y="0" width="1080" height="1920" fill="url(#g-wall)"/>' +
+      '<g transform="translate(' + (S.DROP.x - RS * 790).toFixed(1) + ',' +
+      (S.DROP.y - RS * 1180).toFixed(1) + ') scale(' + RS + ')">' +
+      ART.room() + ART.washer({ both: true }) + '</g>';
+    return room + ring + guide + sheet + hand;
   };
 
   // 7. 제품 작동 (설명용 시각화)
@@ -1016,6 +1044,12 @@
         };
         el.classList.add('is-watch');
         el.style.setProperty('--s6-watch-dur', S.WATCH_MS + 'ms');
+        /* 시연·힌트 애니메이션이 두 자리를 CSS 에서 받아 간다. 예전에는 키프레임에
+         * 좌표가 박혀 있어서 ART.S6 를 고치면 손과 시트만 옛 자리로 날아갔다. */
+        el.style.setProperty('--s6-home-x', S.HOME.x + 'px');
+        el.style.setProperty('--s6-home-y', S.HOME.y + 'px');
+        el.style.setProperty('--s6-drop-x', S.DROP.x + 'px');
+        el.style.setProperty('--s6-drop-y', S.DROP.y + 'px');
         /* 시연에도 개입과 같은 신호를 같은 순서로 낸다 — 집는 소리, 투입되는 소리.
          * 수행 주체만 다르고 들리는 것은 같아야 한다. */
         Sfx.play('grab');

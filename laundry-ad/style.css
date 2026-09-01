@@ -302,9 +302,13 @@ html, body {
 
 /* 장면 2 — 제품 미사용(5초). 세탁기 투입구(790,1180) 쪽으로 다가간다.
  * 실패로 들어가기 직전이라 "저기로 들어간다"는 방향감을 준다. */
+/* 장면 2 는 방 전체가 보이는 와이드였고 **위쪽 절반이 빈 벽**이었다. 세로 화면에서
+ * 상단 절반이 죽어 있었다는 뜻이다. 인물과 세탁기가 화면을 채우는 자리에서 시작해
+ * 아주 조금 더 민다. 배율·이동값은 방 배경이 프레임을 다 덮는 범위 안에서 잡았다 —
+ * 넘어가면 가장자리가 투명하게 남는다(장면 6 에서 한 번 겪었다). */
 @keyframes cam-push2 {
-  0%   { transform: translate(0px, 0px) scale(1); animation-timing-function: cubic-bezier(.3, 0, .7, 1); }
-  100% { transform: translate(-98px, -161px) scale(1.14); }
+  0%   { transform: translate(-188px, -545px) scale(1.3); animation-timing-function: cubic-bezier(.3, 0, .7, 1); }
+  100% { transform: translate(-272px, -732px) scale(1.45); }
 }
 .sc2 .cam { animation: cam-push2 var(--scene-dur, 5s) both; }
 
@@ -430,12 +434,15 @@ html, body {
   transform-origin: 50% 50%;
   pointer-events: none;
 }
+/* 손·시트가 지나는 자리는 ART.S6 의 HOME · DROP 에서 온다(Scene6.attach 가 걸어 준다).
+ * 예전에는 좌표가 키프레임에 박혀 있어서, 시트 자리를 옮기면 손만 옛 자리로 날아갔다.
+ * 괄호 안 폴백은 ART.S6 의 현재 값이다 — 상수를 고치면 여기도 같이 고칠 것. */
 @keyframes s6-hint {
-  0%   { transform: translate(310px, 1600px) scale(1); opacity: 0; }
-  10%  { transform: translate(310px, 1600px) scale(.92); opacity: 1; }
-  62%  { transform: translate(830px, 1250px) scale(1); opacity: 1; }
-  82%  { transform: translate(830px, 1250px) scale(1); opacity: 1; }
-  100% { transform: translate(830px, 1250px) scale(1); opacity: 0; }
+  0%   { transform: translate(calc(var(--s6-home-x, 300px) + 10px), calc(var(--s6-home-y, 1500px) + 100px)) scale(1); opacity: 0; }
+  10%  { transform: translate(calc(var(--s6-home-x, 300px) + 10px), calc(var(--s6-home-y, 1500px) + 100px)) scale(.92); opacity: 1; }
+  62%  { transform: translate(calc(var(--s6-drop-x, 600px) + 40px), calc(var(--s6-drop-y, 880px) + 70px)) scale(1); opacity: 1; }
+  82%  { transform: translate(calc(var(--s6-drop-x, 600px) + 40px), calc(var(--s6-drop-y, 880px) + 70px)) scale(1); opacity: 1; }
+  100% { transform: translate(calc(var(--s6-drop-x, 600px) + 40px), calc(var(--s6-drop-y, 880px) + 70px)) scale(1); opacity: 0; }
 }
 .sc6.hint-on .s6-hand { animation: s6-hint 2.8s ease-in-out infinite; }
 .sc6.hint-on .s6-guide { opacity: .85; transition: opacity 300ms ease; }
@@ -451,11 +458,11 @@ html, body {
   pointer-events: none;
 }
 @keyframes s6-grip-watch {
-  0%   { transform: translate(340px, 1570px); opacity: 0; }
-  8%   { transform: translate(340px, 1570px); opacity: 1; }
-  55%  { transform: translate(860px, 1220px); opacity: 1; }
-  68%  { transform: translate(896px, 1202px); opacity: 0; }
-  100% { transform: translate(896px, 1202px); opacity: 0; }
+  0%   { transform: translate(calc(var(--s6-home-x, 300px) + 70px), calc(var(--s6-home-y, 1500px) + 40px)); opacity: 0; }
+  8%   { transform: translate(calc(var(--s6-home-x, 300px) + 70px), calc(var(--s6-home-y, 1500px) + 40px)); opacity: 1; }
+  55%  { transform: translate(calc(var(--s6-drop-x, 600px) + 70px), calc(var(--s6-drop-y, 880px) + 40px)); opacity: 1; }
+  68%  { transform: translate(calc(var(--s6-drop-x, 600px) + 106px), calc(var(--s6-drop-y, 880px) + 22px)); opacity: 0; }
+  100% { transform: translate(calc(var(--s6-drop-x, 600px) + 106px), calc(var(--s6-drop-y, 880px) + 22px)); opacity: 0; }
 }
 /* 조작 안내 UI — 점선 드롭존 링, 드래그 경로, 힌트 손가락.
    셋 다 "참가자가 조작하라"는 신호이므로 intervene 전용이다. watch에서 이것들이
@@ -467,10 +474,10 @@ html, body {
 /* watch의 시트는 잡을 수 없다 — grab 커서로 조작 가능하다고 오해시키지 않는다 */
 .sc6.is-watch .s6-sheet { cursor: default; }
 @keyframes s6-sheet-watch {
-  0%, 12% { transform: translate(270px, 1530px) scale(1); opacity: 1; }
-  55%     { transform: translate(790px, 1180px) scale(.85); opacity: 1; }
-  66%     { transform: translate(790px, 1180px) scale(.22); opacity: 0; }
-  100%    { transform: translate(790px, 1180px) scale(.22); opacity: 0; }
+  0%, 12% { transform: translate(var(--s6-home-x, 300px), var(--s6-home-y, 1500px)) scale(1); opacity: 1; }
+  55%     { transform: translate(var(--s6-drop-x, 600px), var(--s6-drop-y, 880px)) scale(.85); opacity: 1; }
+  66%     { transform: translate(var(--s6-drop-x, 600px), var(--s6-drop-y, 880px)) scale(.22); opacity: 0; }
+  100%    { transform: translate(var(--s6-drop-x, 600px), var(--s6-drop-y, 880px)) scale(.22); opacity: 0; }
 }
 /* is-watch 는 이제 정지 화면(?still=6)에도 붙는다 — 표시를 끄는 것은 거기서도 필요하기
  * 때문이다. 그래서 시연 애니메이션은 .cam 으로 한 번 더 막는다. 안 그러면 스토리보드가

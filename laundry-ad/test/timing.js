@@ -23,8 +23,10 @@ const { bootPage, wait, dragSheet, suite } = require('./lib/harness');
 const DUR = { 1: 2.94, 2: 1.58, 3: 4.0, 4: 2.08, 5: null, 6: null, 7: 2.44, 8: 1.29, 9: 4.0, 10: 8.0 };
 const PLAYLIST = { watch: [1, 2, 3, 4, 10], intervene: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] };
 
-const HOME = { x: 270, y: 1530 };   // 시트 처음 위치 (ART.S6.HOME)
-const DROP = { x: 790, y: 1180 };   // 투입구       (ART.S6.DROP)
+/* 시트 시작 위치·투입구는 ART.S6 에서 읽는다(w.AD_ART.S6).
+ * 여기 숫자를 박아 두면 자극에서 자리를 옮겼을 때 검사만 옛 자리를 짚어,
+ * 빗나간 드롭을 통과로 읽는다. */
+const s6 = w => w.AD_ART.S6;
 
 const POLL = 50;          // 장면 전환 감지 간격(ms) — 측정 오차의 하한이다
 const TOL = 0.4;          // 허용 오차(초). 타이머 지터 + POLL을 넉넉히 덮는다
@@ -67,7 +69,7 @@ async function play(cond) {
 
     // 장면 6은 드롭해야 넘어간다. 진입 후 S6_THINK 만큼 있다가 한 번만 투입한다.
     if (no === 6 && !dropped && Date.now() - marks[marks.length - 1].at > S6_THINK) {
-      dragSheet(w, HOME, DROP);
+      dragSheet(w, s6(w).HOME, s6(w).DROP);
       dropped = true;
     }
     await wait(POLL);
