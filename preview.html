@@ -105,6 +105,15 @@
   .opt input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   /* 의미변별 — 양극 라벨이 문항마다 다르므로 문항 안에 둔다 */
+  .freetext {
+    width: 100%; box-sizing: border-box; margin-top: 6px; padding: 12px 14px;
+    font: inherit; font-size: 16px; line-height: 1.55; color: inherit;
+    background: #fff; border: 1px solid var(--line, #d8dee6);
+    border-radius: 10px; resize: vertical; min-height: 96px;
+  }
+  .freetext:focus { outline: 2px solid #2FA98C; outline-offset: 1px; }
+  .freenote { margin: 6px 0 0; font-size: 13.5px; }
+
   .poles { display: flex; justify-content: space-between; gap: 10px; margin-top: 8px; font-size: 13px; color: var(--dim); }
   .poles span:last-child { text-align: right; }
 
@@ -462,6 +471,15 @@ function renderItem(item, no, scope, value, stim) {
     body = optButtons(item, scope, value) +
       '<div class="poles"><span>' + esc(item.poles[0]) + '</span>' +
       '<span>' + esc(item.poles[1]) + '</span></div>';
+  } else if (item.type === 'text') {
+    /* 서술형. 값은 CSV 로 나가는데 toCsv 가 쉼표·따옴표·줄바꿈을 이미 감싸므로
+     * 여기서 따로 손댈 것이 없다. 길이만 막아 둔다 — 붙여넣기 사고로 한 칸에
+     * 수십 KB 가 들어가면 수집함(localStorage)이 통째로 넘친다. */
+    body = '<textarea class="freetext" name="' + scope + '__' + item.id + '"' +
+      ' rows="' + (item.rows || 4) + '" maxlength="' + (item.maxlen || 1000) + '"' +
+      (item.placeholder ? ' placeholder="' + esc(item.placeholder) + '"' : '') +
+      '>' + esc(value == null ? '' : String(value)) + '</textarea>' +
+      (item.note ? '<p class="dim freenote">' + esc(item.note) + '</p>' : '');
   } else if (item.type === 'choice') {
     var opts = item.options.map(function (o, i) {
       var v = i + 1;
@@ -507,6 +525,13 @@ function legendFor(items) {
 /** 화면에 그려진 문항 중 미응답인 것의 id 목록 */
 function unanswered(scope, items) {
   return items.filter(function (it) {
+    /* 선택 문항(서술형 소감)은 비워도 다음으로 넘어간다 — 서술형을 필수로 걸면
+     * 마지막 화면에서 이탈하거나 아무 글자나 채우는 응답이 는다. */
+    if (it.optional) return false;
+    if (it.type === 'text') {
+      var t = document.querySelector('textarea[name="' + scope + '__' + it.id + '"]');
+      return !t || !t.value.trim();
+    }
     return !document.querySelector('input[name="' + scope + '__' + it.id + '"]:checked');
   }).map(function (it) { return it.id; });
 }
@@ -514,6 +539,13 @@ function unanswered(scope, items) {
 /** 화면의 응답을 store 에 거둔다 */
 function collect(scope, items, store) {
   items.forEach(function (it) {
+    if (it.type === 'text') {
+      var t = document.querySelector('textarea[name="' + scope + '__' + it.id + '"]');
+      /* 안 쓴 것은 빈 문자열이 아니라 공란(null)이다 — 0 과 공란을 가르는 것과 같은 규칙 */
+      var v = t ? t.value.trim() : '';
+      store[it.id] = v ? v : null;
+      return;
+    }
     var el = document.querySelector('input[name="' + scope + '__' + it.id + '"]:checked');
     store[it.id] = el ? Number(el.value) : null;
   });
@@ -553,6 +585,13 @@ function wireCounter(scope, items) {
                           : '모두 응답했습니다';
     el.className = 'count' + (left ? '' : ' done');
   }
+  document.querySelectorAll('.wrap textarea.freetext').forEach(function (t) {
+    t.addEventListener('input', function () {
+      var host = t.closest('[data-item]');
+      if (host) host.classList.remove('miss');
+      update();
+    });
+  });
   document.querySelectorAll('.wrap input[type=radio]').forEach(function (r) {
     r.addEventListener('change', function () {
       var host = r.closest('[data-item]');
