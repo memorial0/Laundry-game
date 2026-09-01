@@ -58,9 +58,25 @@
   function unlock() {
     var c = ctx();
     if (!c) return false;
-    if (c.state === 'running') return true;
+    if (c.state === 'running') return opened();
     try { c.resume(); } catch (e) { /* 정책에 막힘 */ }
-    return c.state === 'running';
+    if (c.state === 'running') return opened();
+    return false;
+  }
+
+  /* 잠금이 막 풀렸을 때 한 번만 하는 일 — 클립 미리 해독 + 지금 장면 문장 다시 읽기 */
+  var announced = false;
+  function opened() {
+    prime();
+    if (!announced) {
+      announced = true;
+      if (typeof whenOpened === 'function') {
+        var key = null;
+        try { key = whenOpened(); } catch (e) { key = null; }
+        if (key && !playing) say(key, true);
+      }
+    }
+    return true;
   }
 
   function toBuffer(key, cb) {
@@ -82,6 +98,24 @@
     } catch (e) { cb(null); }
   }
 
+  /* 클립을 미리 해독해 둔다.
+   *
+   * toBuffer 는 그 문장을 처음 읽을 때 decodeAudioData 를 부른다. 문장마다 한 번씩이니
+   * **모든 장면이 첫 재생의 해독 시간만큼 늦게 말을 시작한다.** 장면 길이가 4~8초였을
+   * 때는 그 몇십 ms 가 묻혔지만, 지금은 장면이 클립 + 0.3초라(scenes.js 의 DUR 표)
+   * 늦게 시작한 만큼 말끝이 컷에 잘린다.
+   *
+   * 그래서 소리가 열리는 순간 열세 개를 한꺼번에 해독해 둔다. base64 는 이미 메모리에
+   * 있고(네트워크 요청 없음) 합쳐 180KB 남짓이라 한 번에 해도 부담이 없다.
+   * 실패해도 조용히 넘어간다 — 그 문장은 예전처럼 재생 시점에 해독된다. */
+  var primed = false;
+  function prime() {
+    if (primed || !ac) return;
+    primed = true;
+    var keys = Object.keys((CLIPS && CLIPS.mp3) || {});
+    for (var i = 0; i < keys.length; i++) toBuffer(keys[i], function () {});
+  }
+
   /** 울리고 있는 문장을 짧게 줄여 끊는다 */
   function stop() {
     if (!playing || !ac) { playing = null; return; }
@@ -100,9 +134,25 @@
    * 두 문장이 겹쳐 들리면 안 된다.
    * @param {string} key CLIPS 의 키 (s1A · s4B · s6i …)
    */
-  function say(key) {
+  /* 소리가 열리는 순간 다시 읽을 문장을 알려 주는 콜백. scenes.js 가 "지금 장면의
+   * 문장"을 돌려주도록 걸어 둔다.
+   *
+   * 왜 필요한가
+   *   장면에 들어갈 때 자동재생이 막혀 있으면 그 문장은 **그대로 버려졌다.**
+   *   재시도가 없었다. 광고가 31초였을 때는 여덟 문장이 흘러서 늦게 눌러도
+   *   대부분 들렸지만, 길이를 나래이션에 맞춰 10.8초로 줄이자(INTEGRATION §5-14)
+   *   **참가자가 화면을 한 번 누르는 사이에 광고가 끝났다.** 소리를 켜 둔 참가자가
+   *   나래이션을 하나도 못 듣는 일이 생긴다.
+   *
+   *   지금은 잠금이 풀리는 순간 **그때 떠 있는 장면의 문장을 처음부터** 읽는다.
+   *   지나간 문장을 몰아서 읽지는 않는다 — 화면과 말이 어긋나는 것이 더 나쁘다. */
+  var whenOpened = null;
+
+  function say(key, retry) {
     if (muted || !key) return false;
-    spoken++;
+    /* 재시도는 새 요청이 아니다 — VOICE_SPOKEN 은 "읽으려 한 문장 수"라
+     * 같은 문장을 두 번 세면 로그의 뜻이 달라진다. */
+    if (!retry) spoken++;
     var c = ctx();
     if (!c) return false;
     if (c.state !== 'running') unlock();
@@ -142,6 +192,9 @@
 
   window.AD_VOICE = {
     say: say,
+    /* scenes.js 가 "지금 장면의 문장"을 돌려주는 함수를 건다 */
+    set onOpened(fn) { whenOpened = fn; },
+    get onOpened() { return whenOpened; },
     stop: stop,
     unlock: unlock,
     state: state,

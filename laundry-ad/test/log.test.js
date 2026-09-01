@@ -117,16 +117,19 @@ module.exports = async function () {
   c.AD_ENGINE.pause();
   c.AD_ENGINE.gotoNo(6);
   await wait(40);
-  dragSheet(c, { x: 270, y: 1530 }, { x: 150, y: 800 });
+  /* 좌표는 ART.S6 에서 읽는다 — 박아 두면 자극에서 자리를 옮겼을 때 검사만 옛 자리를
+   * 짚어, 빗나간 드롭을 통과로 읽는다. 목적지는 '드롭 존 밖' 이면 되므로 그대로 둔다. */
+  const S6 = c.AD_ART.S6;
+  dragSheet(c, S6.HOME, { x: 150, y: 800 });
   await wait(20);
-  dragSheet(c, { x: 270, y: 1530 }, { x: 900, y: 1700 });
+  dragSheet(c, S6.HOME, { x: 900, y: 1700 });
   await wait(20);
   t.ok(c.AD_RESULT.INT_ATTEMPTS === 2, 'INT_ATTEMPTS = 스냅백 2회', c.AD_RESULT.INT_ATTEMPTS);
   t.ok(typeof c.AD_RESULT.T_FIRST_DRAG === 'number' && c.AD_RESULT.T_FIRST_DRAG >= 0,
     'T_FIRST_DRAG = 첫 드래그까지 걸린 시간(초)', c.AD_RESULT.T_FIRST_DRAG);
   await wait(500);
   t.ok(c.AD_RESULT.HINT_SHOWN === 1, 'HINT_SHOWN 1');
-  dragSheet(c, { x: 270, y: 1530 }, { x: 790, y: 1180 });
+  dragSheet(c, S6.HOME, S6.DROP);
   await wait(1300);
   t.ok(c.AD_RESULT.INT_DONE === 1, 'INT_DONE 1');
   t.ok(c.AD_RESULT.DWELL_INT > 0.5, 'DWELL_INT = 실제 체류(초)', c.AD_RESULT.DWELL_INT);

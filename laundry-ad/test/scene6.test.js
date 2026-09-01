@@ -5,8 +5,10 @@
 'use strict';
 const { bootPage, wait, dragSheet, suite } = require('./lib/harness');
 
-const HOME = { x: 270, y: 1530 };   // 시트 처음 위치 (ART.S6.HOME)
-const DROP = { x: 790, y: 1180 };   // 투입구 (ART.S6.DROP)
+/* 시트 시작 위치·투입구는 ART.S6 에서 읽는다(w.AD_ART.S6).
+ * 여기 숫자를 박아 두면 자극에서 자리를 옮겼을 때 검사만 옛 자리를 짚어,
+ * 빗나간 드롭을 통과로 읽는다. */
+const s6 = w => w.AD_ART.S6;
 
 /** 장면 6까지 이동한 상태의 창을 만든다 */
 async function atScene6(query, idleMs) {
@@ -30,10 +32,11 @@ module.exports = async function () {
   t.ok(!!w.document.querySelector('.s6-ring'), '투입구 점선 하이라이트');
 
   // 1) 드롭 존 밖 → 스냅백
-  const { el, sheet } = dragSheet(w, HOME, { x: 200, y: 900 });
+  const { el, sheet } = dragSheet(w, s6(w).HOME, { x: 200, y: 900 });
   await wait(60);
   t.ok(w.AD_RESULT.INT_ATTEMPTS === 1, '드롭존 밖 → INT_ATTEMPTS 1', w.AD_RESULT.INT_ATTEMPTS);
-  t.ok(/translate\(270px,\s*1530px\)/.test(sheet.style.transform), '원위치로 스냅백', sheet.style.transform);
+  const atHome = win => new RegExp('translate\\(' + s6(win).HOME.x + 'px,\\s*' + s6(win).HOME.y + 'px\\)');
+  t.ok(atHome(w).test(sheet.style.transform), '원위치로 스냅백', sheet.style.transform);
   t.ok(E.scene.no === 6, '장면 6 유지');
   t.ok(w.AD_RESULT.INT_DONE === 0, 'INT_DONE 아직 0');
 
@@ -41,10 +44,10 @@ module.exports = async function () {
   await wait(600);
   t.ok(el.classList.contains('hint-on'), '무조작 시 힌트 표시');
   t.ok(w.AD_RESULT.HINT_SHOWN === 1, 'HINT_SHOWN 1', w.AD_RESULT.HINT_SHOWN);
-  t.ok(/translate\(270px,\s*1530px\)/.test(sheet.style.transform), '힌트가 정답을 대신 수행하지 않음');
+  t.ok(atHome(w).test(sheet.style.transform), '힌트가 정답을 대신 수행하지 않음');
 
   // 3) 투입구에 드롭 → 성공
-  dragSheet(w, HOME, DROP);
+  dragSheet(w, s6(w).HOME, s6(w).DROP);
   t.ok(w.AD_RESULT.INT_DONE === 1, '드롭 성공 → INT_DONE 1');
   t.ok(!el.classList.contains('hint-on'), '성공 시 힌트 종료');
   t.ok(el.classList.contains('is-dropped'), '행동 직후 즉각 반응(is-dropped)');

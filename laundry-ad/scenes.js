@@ -70,6 +70,52 @@
     spoken: 0, heard: 0, text: {}, sec: {}
   };
 
+  /* 장면 길이 — 나래이션이 끝나면 바로 다음 장면으로 넘어간다.
+   *
+   * 예전에는 장면마다 4·5·6·8초로 고정돼 있었고 말이 1초 안팎에 끝나 버리는
+   * 장면이 있어(장면 3 은 0.86초 말하고 5.14초를 더 서 있었다) 말 끝과 컷
+   * 사이가 비었다. 지금은 각 장면이 **클립 길이 + 0.3초** 다. 클립 끝에 무음이
+   * 0.1초쯤 들어 있어 말이 실제로 끝나고 컷까지는 0.4초 안팎이다.
+   *
+   * 왜 클립에서 계산하지 않고 숫자를 적어 두나
+   *   voice-clips.js 는 index.html 에서 두 줄 빼면 사라질 수 있다(INTEGRATION §5-12
+   *   의 되돌리는 법). 길이를 클립에서 읽으면 그때 자극 길이가 통째로 달라진다.
+   *   길이는 참가자 전원에게 같아야 하는 값이라 여기에 못 박고, 클립과 어긋나면
+   *   voice.test.js 가 잡는다.
+   *
+   * A·B 가 갈리는 장면(1·4)은 **긴 쪽**에 맞춘다 — 소재만 다르고 길이는 같아야
+   * 한다는 수용 기준(SPEC 7장) 때문이다. 차이는 0.05·0.06초다.
+   *
+   *   장면   클립(초)                  dur
+   *     1    2.64 (A) · 2.59 (B)  →   2.94
+   *     2    1.28                 →   1.58
+   *     3    0.86                 →   4.00   ← 예외
+   *     4    1.78 (A) · 1.72 (B)  →   2.08
+   *     7    2.14                 →   2.44
+   *     8    0.99                 →   1.29
+   *     9    1.33                 →   4.00   ← 예외
+   *    10    2.77                 →   8.00   ← 예외
+   *
+   * 예외 셋 — **말이 아니라 그림이 일하는 장면**이다. 여기서 남는 시간은 빈 시간이
+   * 아니라 그 장면이 하는 일 자체다. 나머지 다섯 장면은 규칙 그대로 클립 + 0.3초다.
+   *
+   *   3  실패 진행   드럼이 돌고 물이 물드는 것을 말없이 보는 시간이 불안을 쌓는다.
+   *                 1.16초로 자르니 실패가 쌓이지 않고 그냥 튀어나왔다.
+   *   9  결과 비교   좌우를 번갈아 보는 시간이 필요하다. 이 카테고리 광고의 절정이고
+   *                 눈이 두 벌을 오가야 차이가 읽힌다.
+   *  10  CTA        여기서 남는 시간은 **참가자가 누를지 정하는 시간**이다.
+   *                 3.07초일 때 버튼이 자리를 잡는 1.2초를 빼면 실제로 누를 수 있는
+   *                 시간이 1.9초뿐이었다. CTA_CLICK 이 종속변인이라 이건 연출이
+   *                 아니라 측정 문제다. 게임 자극의 제품 카드와 같은 8초로 되돌려
+   *                 두 자극의 제품 메시지 노출을 다시 같게 만든다(INTEGRATION §4).
+   *
+   * 0.1초 단위로 반올림하지 않는다 — 반올림하면 남는 여백이 장면마다 갈리고
+   * (버전 B 는 클립이 0.05초 짧아 더 남는다) 그 차이가 다시 빈 시간이 된다.
+   *
+   * 장면 5·6 은 길이가 참가자에게 달려 있어 이 표에 없다.
+   * 장면 안의 CSS 애니메이션은 --scene-dur 로 이 값을 받아 같이 줄어든다. */
+  var DUR = { 1: 2.94, 2: 1.58, 3: 4.0, 4: 2.08, 7: 2.44, 8: 1.29, 9: 4.0, 10: 8.0 };
+
   /* 장면 번호 → 클립 키. 자막이 갈리는 장면만 뒤에 판별자가 붙는다 —
    * 1·4 는 소재(ver), 6 은 수행 주체(mode)에 따라 자막이 다르다.
    * voice.test.js 가 이 표를 자막 함수와 직접 대조한다. */
@@ -131,7 +177,10 @@
   var PAL = {
     // 세탁실
     wall: '#E7EEF4', wallLo: '#D8E3EC', wallHi: '#F3F8FB',
-    floor: '#EBE4D8', floorLo: '#DCD3C3', base: '#CBC1AE',
+    /* base 는 걸레받이·선반에 쓰는 가장 어두운 배경 값이다. 화면 전체가 옅은
+     * 민트·흰색·베이지라 **눈이 붙잡을 어두운 자리가 하나도 없었다.** 걸레받이는
+     * 모든 방 장면을 가로지르는 띠라 여기를 눌러 주면 화면에 가로 기준선이 생긴다. */
+    floor: '#EBE4D8', floorLo: '#D6C9B2', base: '#B0A187',
     // 세탁기
     body: '#FFFFFF', bodyLo: '#E4EBF2', panel: '#EEF3F8', edge: '#C4CFDB',
     ring: '#B6C3D1', ringLo: '#93A2B4', door: '#DCE5EE', glass: '#8FA3B8', opening: '#3D4A5C',
@@ -152,7 +201,7 @@
   // ver B: 소재 외에 인물 옷 색상·배경 색조만 다르다 (구도·길이·정보량 동일)
   if (CFG.ver === 'B') {
     PAL.wall = '#F2ECE4'; PAL.wallLo = '#E6DCD0'; PAL.wallHi = '#FBF7F1';
-    PAL.floor = '#D6DBE0'; PAL.floorLo = '#C4CBD2'; PAL.base = '#B7BFC7';
+    PAL.floor = '#D6DBE0'; PAL.floorLo = '#B8C0CA'; PAL.base = '#99A5B3';
     PAL.wear = '#C08466'; PAL.wearLo = '#A56C51';
     PAL.light = '#FFFCF6'; PAL.lightEdge = '#DDCDB2'; PAL.lightShade = '#F5EBDA';
   }
@@ -182,6 +231,29 @@
       '<radialGradient id="g-pack" cx="0.5" cy="0.42" r="0.7">' +
       '<stop offset="0" stop-color="' + PAL.brandPale + '"/><stop offset="1" stop-color="' + PAL.wall + '"/>' +
       '</radialGradient>' +
+      /* 제품명 위를 한 번 스치는 빛(장면 10). 게임 자극의 제품 카드에도 같은 연출이
+       * 같은 값으로 들어가 있다 — 한쪽 제품명만 반짝이면 그 차이가 제품 평가로 들어간다. */
+      '<linearGradient id="g-sheen" x1="0" y1="0" x2="1" y2="0">' +
+      '<stop offset="0" stop-color="#fff" stop-opacity="0"/>' +
+      '<stop offset="0.5" stop-color="#fff" stop-opacity="0.9"/>' +
+      '<stop offset="1" stop-color="#fff" stop-opacity="0"/>' +
+      '</linearGradient>' +
+      /* 클로즈업 배경 — 가장자리를 눌러 옷이 뜨게 한다. 벽도 옷도 거의 흰색이라
+       * 붙여 놓으면 옷의 실루엣이 배경에 묻혔다. 광고 조명에서 제품 뒤를 어둡게
+       * 까는 것과 같은 이유다. */
+      '<radialGradient id="g-vig" cx="0.5" cy="0.46" r="0.72">' +
+      '<stop offset="0" stop-color="#fff" stop-opacity="0.55"/>' +
+      '<stop offset="0.55" stop-color="#fff" stop-opacity="0"/>' +
+      '<stop offset="1" stop-color="' + PAL.ink + '" stop-opacity="0.17"/>' +
+      '</radialGradient>' +
+      /* 이염의 세로 농도. 물에 잠겨 있던 아래쪽이 더 짙다 — 균일하게 깔면
+       * 옷 색깔 자체가 그런 것처럼 보이고 "물들었다"로 안 읽힌다. */
+      '<linearGradient id="g-dye" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0" stop-color="' + PAL.stain + '" stop-opacity="0.05"/>' +
+      '<stop offset="0.45" stop-color="' + PAL.stain + '" stop-opacity="0.13"/>' +
+      '<stop offset="1" stop-color="' + PAL.stain + '" stop-opacity="0.26"/>' +
+      '</linearGradient>' +
+      '<clipPath id="c-s10name"><rect x="376" y="1132" width="328" height="100"/></clipPath>' +
       '<filter id="f-soft" x="-30%" y="-30%" width="160%" height="160%">' +
       '<feGaussianBlur stdDeviation="7"/></filter>' +
       '<filter id="f-blob" x="-40%" y="-40%" width="180%" height="180%">' +
@@ -295,19 +367,29 @@
       '</g>';
   };
 
-  /* 시트 1장 */
+  /* 시트 1장
+   *
+   * 시트에 브랜드를 적는다. 예전에는 동그란 마크와 물결선뿐이라, 참가자가 세탁기에
+   * 끌어다 넣는 물건이 **무엇인지 화면에서 읽히지 않았다** — 브랜드는 선반 위 상자에만
+   * 있었고 그건 배경 소품이라 눈이 안 간다. 개입 조건에서 참가자가 직접 다루는 유일한
+   * 물건이 이 시트이므로, 넣는 동안 이름이 보여야 "클린가드를 넣었다"가 된다.
+   * 장면 6(끌어다 놓기)·7(작동)·10(팩샷) 이 같은 함수를 쓰므로 세 곳이 같이 바뀐다.
+   *
+   * 마크(동그라미)를 빼고 그 자리에 이름을 넣었다. 둘 다 두면 124 높이에 마크·이름·
+   * 물결선 셋이 겹친다. 물결선은 아래로 내렸다 — 세탁물을 뜻하는 기호라 남긴다. */
   ART.sheet = function (x, y, s, cls) {
     s = s === undefined ? 1 : s;
     return '<g class="' + (cls || '') + '" transform="translate(' + x + ',' + y + ') scale(' + s + ')">' +
       '<rect x="-90" y="-62" width="180" height="124" rx="20" fill="' + PAL.sheet + '" stroke="' + PAL.sheetEdge + '" stroke-width="5"/>' +
       '<rect x="-90" y="-62" width="180" height="124" rx="20" fill="' + PAL.brandPale + '" opacity=".55"/>' +
-      '<path d="M-62,-14 q31,-20 62,0 t62,0 M-62,24 q31,-20 62,0 t62,0" fill="none" stroke="' + PAL.brand + '" stroke-width="5" stroke-linecap="round" opacity=".75"/>' +
-      '<circle cx="0" cy="-36" r="13" fill="none" stroke="' + PAL.brand + '" stroke-width="5"/>' +
-      '<circle cx="0" cy="-36" r="4" fill="' + PAL.brand + '"/>' +
+      ART.text(0, -12, 30, BRAND, { fill: PAL.brandLo, weight: 800 }) +
+      '<path d="M-62,16 q31,-20 62,0 t62,0 M-62,44 q31,-20 62,0 t62,0" fill="none" stroke="' + PAL.brand + '" stroke-width="5" stroke-linecap="round" opacity=".75"/>' +
       '</g>';
   };
 
   /* 의류 — kind: shirt | tee | towel | socks. (x,y)=좌상단, 로컬 200x210 */
+  var GARMENT_UID = 0;
+
   ART.garment = function (kind, o) {
     o = o || {};
     var fill = o.fill || PAL.light;
@@ -317,10 +399,16 @@
 
     var shade = o.shade || (o.fill ? PAL.darkHi : PAL.lightShade);
 
+    /* 옷의 바깥 모양. 보이는 몸판과 얼룩을 자르는 clipPath 가 **같은 path** 를 쓴다 —
+     * 예전에는 얼룩이 아무 데도 안 잘려서 옷 밖으로 삐져나왔다. 멀리서 볼 때는 안
+     * 보였지만 카메라를 붙이자 얼룩이 인물의 몸통 위에 그려져 있었다. */
+    var outline = '';
+
     if (kind === 'shirt' || kind === 'tee') {
+      outline = '<path d="M70,14 L44,6 L8,44 L40,80 L54,64 L54,200 L146,200 L146,64 L160,80 L192,44 L156,6 L130,14' +
+        ' C122,42 78,42 70,14 Z"';
       body =
-        '<path d="M70,14 L44,6 L8,44 L40,80 L54,64 L54,200 L146,200 L146,64 L160,80 L192,44 L156,6 L130,14' +
-        ' C122,42 78,42 70,14 Z" fill="' + fill + '" stroke="' + edge + '" stroke-width="5" stroke-linejoin="round"/>' +
+        outline + ' fill="' + fill + '" stroke="' + edge + '" stroke-width="5" stroke-linejoin="round"/>' +
         // 소매·옆선 음영
         '<path d="M54,64 L54,200 L86,200 L86,70 Z" fill="' + shade + '" opacity=".5"/>' +
         '<path d="M8,44 L40,80 L54,64 L30,34 Z" fill="' + shade + '" opacity=".35"/>';
@@ -336,8 +424,9 @@
           '<path d="M60,192 h80" stroke="' + edge + '" stroke-width="4" opacity=".6"/>';
       }
     } else if (kind === 'towel') {
+      outline = '<rect x="22" y="20" width="156" height="176" rx="12"';
       body =
-        '<rect x="22" y="20" width="156" height="176" rx="12" fill="' + fill + '" stroke="' + edge + '" stroke-width="5"/>' +
+        outline + ' fill="' + fill + '" stroke="' + edge + '" stroke-width="5"/>' +
         '<rect x="22" y="20" width="42" height="176" rx="12" fill="' + shade + '" opacity=".45"/>' +
         '<rect x="30" y="128" width="140" height="13" rx="6" fill="' + edge + '"/>' +
         '<rect x="30" y="152" width="140" height="13" rx="6" fill="' + edge + '" opacity=".7"/>' +
@@ -358,19 +447,87 @@
       body = sock(6, -6) + sock(76, 8);
     }
 
-    // 이염 얼룩 — 번진 느낌이 나도록 흐린 후광 + 진한 코어
+    /* 이염 얼룩.
+     *
+     * 예전에는 타원 다섯 개였다. 멀리서는 넘어갔지만 클로즈업으로 바꾸자
+     * **물방울이나 비눗방울로 읽혔다** — 실제 이염은 동그란 점이 아니다.
+     * 세 겹으로 다시 짰다.
+     *
+     *   ① 전체 톤  옷 전체가 칙칙해진다. 이염의 첫인상은 얼룩이 아니라 **흰색이
+     *              탁해진 것**이다. 이 겹이 없으면 "깨끗한 옷에 점이 묻었다"가 된다.
+     *   ② 번진 덩어리  경계가 불규칙하고 흐린 후광이 있다. 원이 아니다.
+     *   ③ 잔 얼룩  작은 것들이 흩어져 있어야 "물에서 옮은 것"으로 보인다.
+     *              하나씩 찍힌 것처럼 크기가 고르면 오염이 아니라 무늬가 된다.
+     *
+     * 모양은 **난수가 아니라 고정 표**로 만든다. 난수를 쓰면 참가자마다 얼룩이
+     * 달라지고, 그러면 같은 자극이 아니다. */
     var stain = '';
     if (o.stained && kind !== 'socks') {
-      var blots = [[78, 96, 30, 24], [124, 136, 25, 20], [68, 162, 21, 16], [128, 78, 16, 13], [100, 186, 22, 11]];
-      var halo = '', core = '';
-      for (var i = 0; i < blots.length; i++) {
-        var b = blots[i];
-        halo += '<ellipse cx="' + b[0] + '" cy="' + b[1] + '" rx="' + (b[2] + 8) + '" ry="' + (b[3] + 7) + '"/>';
-        core += '<ellipse cx="' + b[0] + '" cy="' + b[1] + '" rx="' + b[2] + '" ry="' + b[3] + '"/>';
+      var cid = 'c-garment-' + (++GARMENT_UID);
+
+      /* 각도별 반지름 배율. 이 값이 얼룩의 들쭉날쭉함을 만든다. */
+      var blob = function (cx, cy, r, k, rot, amp) {
+        var n = k.length, pts = [], i2, a, f;
+        rot = rot || 0;
+        amp = amp === undefined ? 2.2 : amp;
+        for (i2 = 0; i2 < n; i2++) {
+          a = (Math.PI * 2 * i2) / n;
+          /* 표의 값을 1 기준으로 부풀린다. 표를 그대로 쓰면 거의 원이라 물방울로
+           * 보이고, rot 으로 시작점을 옮기면 같은 표에서 다른 모양이 나온다. */
+          f = 1 + (k[(i2 + rot) % n] - 1) * amp;
+          pts.push([cx + Math.cos(a) * r * f, cy + Math.sin(a) * r * f * 0.84]);
+        }
+        var mid = function (p, q) {
+          return ((p[0] + q[0]) / 2).toFixed(1) + ',' + ((p[1] + q[1]) / 2).toFixed(1);
+        };
+        var d = 'M' + mid(pts[n - 1], pts[0]);
+        for (i2 = 0; i2 < n; i2++) {
+          d += ' Q' + pts[i2][0].toFixed(1) + ',' + pts[i2][1].toFixed(1) +
+            ' ' + mid(pts[i2], pts[(i2 + 1) % n]);
+        }
+        return '<path d="' + d + ' Z"/>';
+      };
+
+      /* 12점 · 이웃한 값이 완만하게 변한다. 8점에 큰 값이 번갈아 들어가면 별 모양이
+       * 되고, 그걸 부드럽게 이으면 **둥근 사각형**이 된다 — 처음 짰을 때 그랬다. */
+      var BLOTS = [
+        [82, 132, 40, [1.00, 1.07, 1.11, 1.04, 0.94, 0.87, 0.90, 0.97, 1.05, 1.09, 1.02, 0.95]],
+        [124, 96, 21, [0.93, 0.98, 1.06, 1.10, 1.05, 0.96, 0.89, 0.92, 1.00, 1.08, 1.11, 1.01]],
+        [128, 168, 25, [1.08, 1.02, 0.94, 0.90, 0.96, 1.04, 1.10, 1.06, 0.98, 0.91, 0.95, 1.03]],
+        [66, 78, 13, [0.96, 1.04, 1.09, 1.03, 0.95, 0.90, 0.94, 1.02, 1.08, 1.05, 0.97, 0.92]],
+        [96, 190, 15, [1.05, 1.10, 1.03, 0.95, 0.90, 0.93, 1.01, 1.07, 1.09, 1.00, 0.94, 0.98]]
+      ];
+      var SPECKS = [
+        [106, 64, 6], [56, 120, 5], [148, 110, 4], [88, 144, 6],
+        [120, 168, 4], [70, 74, 4], [140, 152, 5], [94, 116, 4]
+      ];
+      var SPECK_K = [1.00, 1.06, 0.97, 0.92, 0.98, 1.05, 1.08, 1.01, 0.95, 0.91, 0.99, 1.04];
+
+      /* 세 겹이 같은 중심·같은 모양이면 과녁처럼 보인다 — 얼룩이 아니라 물방울이다.
+       * 겹마다 시작점(rot)을 옮기고 속은 중심에서 비껴 놓는다. */
+      var halo = '', core = '', deep = '', speck = '';
+      for (var i3 = 0; i3 < BLOTS.length; i3++) {
+        var b = BLOTS[i3];
+        halo += blob(b[0], b[1], b[2] + 11, b[3], 3, 2.6);
+        core += blob(b[0], b[1], b[2], b[3], 0, 2.2);
+        if (i3 < 3) deep += blob(b[0] + b[2] * 0.22, b[1] - b[2] * 0.18, b[2] * 0.5, b[3], 7, 2.4);
       }
+      for (var i4 = 0; i4 < SPECKS.length; i4++) {
+        speck += blob(SPECKS[i4][0], SPECKS[i4][1], SPECKS[i4][2], SPECK_K, i4, 2.0);
+      }
+
       stain =
-        '<g fill="' + PAL.stain + '" opacity=".45" filter="url(#f-blob)">' + halo + '</g>' +
-        '<g fill="' + PAL.stain + '" opacity=".72">' + core + '</g>';
+        '<defs><clipPath id="' + cid + '">' + outline + '/></clipPath></defs>' +
+        '<g clip-path="url(#' + cid + ')">' +
+        // ① 옷 전체가 탁해진다
+        outline + ' fill="url(#g-dye)"/>' +
+        // ② 번진 덩어리 — 흐린 후광 · 본체 · 더 진한 속
+        '<g fill="' + PAL.stain + '" opacity=".26" filter="url(#f-blob)">' + halo + '</g>' +
+        '<g fill="' + PAL.stain + '" opacity=".42">' + core + '</g>' +
+        '<g fill="' + PAL.dye + '" opacity=".16" filter="url(#f-blob)">' + deep + '</g>' +
+        // ③ 잔 얼룩
+        '<g fill="' + PAL.stain + '" opacity=".34" filter="url(#f-blob)">' + speck + '</g>' +
+        '</g>';
     }
 
     return '<g class="garment ' + (o.cls || '') + '" transform="translate(' + (o.x || 0) + ',' + (o.y || 0) + ') scale(' + s + ')">' + body + stain + '</g>';
@@ -515,21 +672,40 @@
   function anim(cls, still) { return still ? '' : cls; }
 
   // 1. 목표
+  /* 1. 목표 — 밝은 옷과 짙은 옷을 하나씩 들고 있는 클로즈업.
+   *
+   * 예전에는 방 전체가 보이는 와이드 샷이었고, **장면 2 와 거의 같은 그림이었다** —
+   * 같은 거리·같은 자리에 선 인물·같은 세탁기. 광고가 똑같은 프레임 두 장으로
+   * 시작하고 있었다. 지금은 1 이 클로즈업, 2 가 와이드다.
+   *
+   * 이 광고의 전제는 "밝은 옷과 짙은 옷을 **같이** 빤다"이고, 그 둘을 나란히 든
+   * 그림이면 첫 컷에 전제가 다 들어간다. 말풍선은 뺐다 — 얼굴이 없는 컷에서
+   * 말풍선은 가리킬 대상이 없고, 담고 있던 문구("내일 입을 셔츠")는 자막이
+   * 그대로 갖고 있어 정보량은 그대로다.
+   *
+   * 짙은 옷이 왼쪽·밝은 옷이 오른쪽인 것은 예전 배치 그대로다. */
   ART.s1 = function (o) {
     o = o || {};
-    var bubble =
-      '<g class="' + anim('s1-bubble', o.still) + '">' +
-      '<rect x="84" y="326" width="600" height="214" rx="48" fill="#fff" stroke="' + PAL.edge + '" stroke-width="6"/>' +
-      '<path d="M300,538 L288,616 L372,536 Z" fill="#fff" stroke="' + PAL.edge + '" stroke-width="6" stroke-linejoin="round"/>' +
-      '<path d="M302,536 H368" stroke="#fff" stroke-width="12"/>' +
-      ART.text(384, 458, 56, '내일 ' + V.light.use + ' ' + V.light.name, { weight: 700 }) +
-      '</g>';
-    return ART.room() + ART.washer({}) +
-      ART.person({ arms: ART.armsHold }) +
-      ART.lightGarment({ x: 382, y: 1032, s: 0.92, cls: 's1-hold s1-hold-l' }) +
-      ART.darkGarment({ x: 118, y: 1036, s: 0.86, cls: 's1-hold s1-hold-d' }) +
-      bubble;
+    /* 둘을 나란히 같은 높이로 두면 두 물건이 대등해 보이고 화면 아래가 통째로 빈다.
+     * 짙은 옷을 왼쪽 위 · 밝은 옷을 오른쪽 아래로 어긋나게 놓아 대각선을 만든다 —
+     * 세로 화면이 채워지고, 크기 차이로 **밝은 옷이 주인공**인 것도 같이 말한다. */
+    var put = function (shape, S, X, Y) {
+      var m = ART.GARMENT_BODY[shape] || ART.GARMENT_BODY.shirt;
+      return { x: X - S * m.cx, y: Y - S * m.cy, hx: X, hy: Y - S * (m.cy - m.top), s: S };
+    };
+    var dark = put(V.dark.shape, 3.6, 280, 860);
+    var light = put(V.light.shape, 4.4, 760, 1180);
+    var aD = ART.armFromTop(dark.hx, dark.hy, -1, 118, 2.6);
+    var aL = ART.armFromTop(light.hx, light.hy, 1, 130, 2.6);
+
+    return ART.room({ noProps: true }) +
+      '<rect x="0" y="0" width="1080" height="1920" fill="url(#g-vig)"/>' +
+      aD.arm + aL.arm +
+      ART.darkGarment({ x: dark.x, y: dark.y, s: dark.s, cls: 's1-hold s1-hold-d' }) +
+      ART.lightGarment({ x: light.x, y: light.y, s: light.s, cls: 's1-hold s1-hold-l' }) +
+      aD.hand + aL.hand;
   };
+
 
   // 2. 제품 미사용 — 상자는 선반 위에 그대로(사용하지 않음)
   ART.s2 = function (o) {
@@ -566,7 +742,7 @@
   // 4. 실패 결과
   ART.s4 = function (o) {
     o = o || {};
-    return ART.holdFrame({ stained: true, mood: 'worried', still: o.still });
+    return ART.holdCloseup({ stained: true, still: o.still });
   };
 
   // 4·8·9 공용 — 제품 사용 여부(stained)만 다르다. 인물·의류·구도는 같은 코드
@@ -574,6 +750,70 @@
     o = o || {};
     return ART.person({ mood: o.mood || 'neutral', arms: ART.armsLift }) +
       ART.lightGarment({ x: 220, y: 840, s: 1.1, stained: !!o.stained, cls: 'hold-garment' });
+  };
+
+  /* 옷을 들어 올려 살펴보는 클로즈업 (장면 4·8·9 공용)
+   *
+   * 왜 전신 샷을 버렸나
+   *   예전에는 방 전체가 보이는 와이드 샷에 인물이 옷을 가슴 앞에 들고 있었다.
+   *   그 구도에서는 **옷이 몸통 위에 겹쳐 그려져 "들고 있다"가 아니라 "입고 있다"로
+   *   읽혔고**, 정작 봐야 할 얼룩이 화면 폭의 6분의 1이었다. 세탁 광고가 사는 자리는
+   *   천이 화면을 채우는 클로즈업이다 — 이 장면들의 일은 "색이 변한 것을 한눈에
+   *   보이게"(SPEC 3장)이지 인물을 보여 주는 것이 아니다.
+   *
+   * 얼굴을 뺀 이유
+   *   손과 소매만 남기고 얼굴은 프레임 밖이다. 표정으로 실패를 전하면 그 실패가
+   *   **사람의 실수**로 읽히는데, 원인은 "시트를 안 넣은 것" 하나여야 하고 인물을
+   *   무능하게 그리지 않는 것이 고정 원칙이다(SPEC 2장). 옷이 주인공이면 탓이
+   *   염료로 간다. 대신 옷이 처지는 연출(s4-garment-check)이 감정을 맡는다.
+   *
+   * 두 조건·두 버전이 같은 함수를 쓴다. stained 값 하나만 다르다. */
+  /* 옷 모양마다 다른 값 — 몸판의 중심(카메라가 맞출 자리)과 손이 잡는 어깨 위치.
+   * 셔츠는 200×210 상자 안에서 몸판이 x54~146 뿐이라 상자 중심과 몸판 중심이 다르다.
+   * 상자를 기준으로 맞추면 옷이 화면 가운데에서 아래로 밀린다. */
+  ART.GARMENT_BODY = {
+    shirt: { cx: 100, cy: 132, gx1: 44, gx2: 156, gy: 14, top: 8 },
+    tee:   { cx: 100, cy: 132, gx1: 44, gx2: 156, gy: 14, top: 8 },
+    towel: { cx: 100, cy: 108, gx1: 30, gx2: 170, gy: 26, top: 22 },
+    socks: { cx: 114, cy: 119, gx1: 50, gx2: 150, gy: 34, top: 32 }
+  };
+
+  /* 위에서 내려온 팔 하나 + 그 끝의 손. 클로즈업 장면들이 공유한다. */
+  ART.armFromTop = function (hx, hy, dir, w, handScale) {
+    return {
+      arm: '<path d="M' + (hx + dir * (w || 150)) + ',-120 L' + hx + ',' + hy + '"' +
+        ' stroke="' + PAL.wear + '" stroke-width="' + (w || 150) + '" stroke-linecap="round" fill="none"/>',
+      hand: '<g transform="translate(' + hx + ',' + hy + ') scale(' + (handScale || 3.4) + ')">' +
+        ART.personHand(0, 0) + '</g>'
+    };
+  };
+
+  ART.holdCloseup = function (o) {
+    o = o || {};
+    var S = 6.5;                                   // 몸판이 화면 폭의 약 55%가 되는 배율
+    var m = ART.GARMENT_BODY[V.light.shape] || ART.GARMENT_BODY.shirt;
+    var x = 540 - S * m.cx;                        // 몸판 중심을 화면 가운데로
+    var y = 1000 - S * m.cy;
+    var hx1 = x + m.gx1 * S, hx2 = x + m.gx2 * S, hy = y + m.gy * S;
+
+    /* 팔은 화면 위에서 비스듬히 들어온다. 세로로 곧게 내리면 옷걸이로 보인다.
+     * 옷과 손은 한 덩어리(.hold-garment)로 움직이고 팔은 가만히 있다 — 움직임이
+     * 작고 손이 팔 끝을 덮어서 떨어져 보이지 않는다. */
+    var arm = function (hx, dir) {
+      return '<path d="M' + (hx + dir * 170) + ',-120 L' + hx + ',' + hy + '"' +
+        ' stroke="' + PAL.wear + '" stroke-width="150" stroke-linecap="round" fill="none"/>';
+    };
+    var hand = function (hx) {
+      return '<g transform="translate(' + hx + ',' + hy + ') scale(3.4)">' + ART.personHand(0, 0) + '</g>';
+    };
+
+    return ART.room({ noProps: true }) +
+      '<rect x="0" y="0" width="1080" height="1920" fill="url(#g-vig)"/>' +
+      arm(hx1, -1) + arm(hx2, 1) +
+      '<g class="hold-garment">' +
+      ART.lightGarment({ x: x, y: y, s: S, stained: !!o.stained }) +
+      hand(hx1) + hand(hx2) +
+      '</g>';
   };
 
   ART.holdFrame = function (o) {
@@ -635,8 +875,21 @@
 
   // 6. 수정 행동 — watch/intervene가 같은 그림을 쓰고 "수행 주체"만 다르다
   ART.S6 = {
-    HOME: { x: 270, y: 1530 },
-    DROP: { x: 790, y: 1180 },
+    /* 시트 시작 위치와 투입구 — **화면 좌표**다. 포인터는 getScreenCTM 으로 뷰박스
+     * 좌표로 바뀌므로 여기 값이 곧 참가자가 만지는 자리다.
+     *
+     * 예전에는 시트가 (270,1530) 왼쪽 아래 구석, 투입구가 (790,1180) 오른쪽이었고
+     * 세탁기가 작아 **화면의 절반 이상이 빈 벽과 바닥**이었다. 개입 조건 참가자가
+     * 실제로 조작하는 유일한 장면인데 정작 조작할 것들이 구석에 몰려 있었다.
+     * 방·세탁기를 1.5배로 키워 앉히고(ART.s6) 두 자리를 화면 가운데로 끌어왔다.
+     *
+     * 끄는 거리는 627 → 675 로 8% 늘었다. 드롭 판정 반경(HIT)과 시트 크기는 그대로라
+     * 조작 난이도 자체는 바뀌지 않는다. T_MANIP 을 예전 값과 직접 비교하지 말 것. */
+    HOME: { x: 300, y: 1500 },
+    DROP: { x: 600, y: 880 },
+    /* 방·세탁기를 키우는 배율. 시트·투입구는 이 변환 밖에서 화면 좌표로 그린다 —
+     * 안에 넣으면 포인터 좌표와 어긋나 드래그가 빗나간다. */
+    ROOM_SCALE: 1.5,
     HIT: 190,
     IDLE_MS: 8000,
     WATCH_MS: WATCH_S6_MS   // watch 재생 길이 — 조정은 WATCH_S6_MS 한 곳에서
@@ -645,8 +898,11 @@
   ART.s6 = function (o) {
     o = o || {};
     var S = ART.S6;
+    /* 안내선은 두 자리 사이를 잇는다. 예전에는 휘는 지점이 숫자로 박혀 있어(Q560,1300)
+     * 자리를 옮기면 선이 엉뚱한 데로 휘었다. 두 점에서 계산한다. */
+    var qx = (S.HOME.x + S.DROP.x) / 2 - 40, qy = (S.HOME.y + S.DROP.y) / 2 + 60;
     var guide = '<path class="s6-guide" d="M' + (S.HOME.x + 90) + ',' + (S.HOME.y - 70) +
-      ' Q560,1300 ' + (S.DROP.x - 130) + ',' + (S.DROP.y + 40) + '"' +
+      ' Q' + qx.toFixed(0) + ',' + qy.toFixed(0) + ' ' + (S.DROP.x - 130) + ',' + (S.DROP.y + 40) + '"' +
       ' fill="none" stroke="' + PAL.brand + '" stroke-width="10" stroke-dasharray="22 22" stroke-linecap="round" opacity=".45"/>';
     var ring = '<g class="s6-ring">' +
       '<circle cx="' + S.DROP.x + '" cy="' + S.DROP.y + '" r="170" fill="' + PAL.brand + '" opacity=".12"/>' +
@@ -661,7 +917,16 @@
       '</g>';
     var hand = '<g class="s6-hand">' + ART.hand() + '</g>' +
       '<g class="s6-grip">' + ART.handGrip() + '</g>';
-    return ART.room() + ART.washer({ both: true }) + ring + guide + sheet + hand;
+    /* 방과 세탁기만 키운다. 투입구(DROP)가 커진 세탁기의 문 자리에 오도록 옮긴다 —
+     * 원본에서 문은 (790,1180) 이므로 그 점이 DROP 으로 가는 평행이동을 구한다. */
+    var RS = S.ROOM_SCALE;
+    /* 키운 방은 화면을 다 못 덮는다(옮긴 만큼 한쪽이 비어 벽지가 끊긴다).
+     * 뒤에 벽 한 장을 깔아 둔다 — 이게 없으면 프레임 가장자리가 투명하게 남는다. */
+    var room = '<rect x="0" y="0" width="1080" height="1920" fill="url(#g-wall)"/>' +
+      '<g transform="translate(' + (S.DROP.x - RS * 790).toFixed(1) + ',' +
+      (S.DROP.y - RS * 1180).toFixed(1) + ') scale(' + RS + ')">' +
+      ART.room() + ART.washer({ both: true }) + '</g>';
+    return room + ring + guide + sheet + hand;
   };
 
   // 7. 제품 작동 (설명용 시각화)
@@ -686,7 +951,7 @@
   // 8. 개선 결과 — 원래 색에 "가까운" 상태
   ART.s8 = function (o) {
     o = o || {};
-    return ART.holdFrame({ stained: false, mood: 'happy', still: o.still });
+    return ART.holdCloseup({ stained: false, still: o.still });
   };
 
   // 9. 결과 비교 — 제품 사용 여부 외 조건 동일(같은 함수 · 같은 인물 · 같은 구도)
@@ -695,15 +960,21 @@
     var half = function (side, stained, label) {
       var clipX = side === 'L' ? 0 : 540;
       // 배율 1:1 · 같은 함수 · stained 값만 다르다
-      var dx = clipX + 270 - 330;
+      var m = ART.GARMENT_BODY[V.light.shape] || ART.GARMENT_BODY.shirt;
+      var GS = 3.1;                                   // 반쪽 폭(540) 안에서 몸판이 약 53%
+                                                      // (3.4 는 어깨가 비교 박스 윗변에 잘렸다)
+      var gx = clipX + 270 - GS * m.cx;
+      var gy = TOP + H / 2 - GS * m.cy;
       return '<clipPath id="s9-' + side + '"><rect x="' + clipX + '" y="' + TOP + '" width="540" height="' + H + '"/></clipPath>' +
         '<g clip-path="url(#s9-' + side + ')">' +
         '<rect x="' + clipX + '" y="' + TOP + '" width="540" height="' + H + '" fill="url(#g-wall)"/>' +
         '<rect x="' + clipX + '" y="1382" width="540" height="' + (TOP + H - 1382) + '" fill="url(#g-floor)"/>' +
         '<rect x="' + clipX + '" y="1374" width="540" height="26" fill="' + PAL.base + '"/>' +
-        '<g transform="translate(' + dx + ',0)">' +
-        ART.holdFigure({ stained: stained, mood: stained ? 'worried' : 'happy' }) +
-        '</g>' +
+        /* 옷만 크게 놓는다. 예전에는 인물 전신 두 명이 나란히 서 있었는데, 둘이
+         * 같은 포즈·같은 색이라 **차이를 찾아야 보였다.** 전후 비교는 광고의 절정이고
+         * 0.3초 안에 때려야 하는 자리다. 얼굴을 빼면 남는 차이가 얼룩 하나뿐이다 —
+         * "제품 사용 여부 외 조건이 동일"(SPEC 7장 수용 기준)도 더 엄격하게 지켜진다. */
+        ART.lightGarment({ x: gx, y: gy, s: GS, stained: stained }) +
         '</g>' +
         '<g>' +
         '<rect x="' + (clipX + 110) + '" y="' + (TOP - 92) + '" width="320" height="66" rx="33" fill="' +
@@ -739,6 +1010,13 @@
       '</g>' +
       '</g>' +
       '<g class="s10-name">' + ART.text(540, 1214, 76, BRAND, { weight: 800, fill: PAL.brandLo }) + '</g>' +
+      /* 제품명을 빛이 한 번 스친다. 자르기(clip)는 바깥 그룹이 걸고 움직이는 것은 안쪽
+       * 그룹이다 — 자른 영역과 움직이는 띠가 같은 그룹에 있으면 자르는 창까지 같이
+       * 따라가서 띠가 영영 창 안에 머문다. 한 번만 돈다(무한 반복 아님). */
+      '<g clip-path="url(#c-s10name)"><g class="s10-sheen">' +
+      '<g transform="translate(540,1182)">' +
+      '<rect x="-400" y="-62" width="120" height="124" fill="url(#g-sheen)" transform="skewX(-14)"/>' +
+      '</g></g></g>' +
       '<rect class="s10-rule" x="384" y="1252" width="312" height="6" rx="3" fill="' + PAL.brand + '" opacity=".45"/>' +
       '<g class="s10-sub">' + ART.text(540, 1320, 44, '이염 방지 세탁 시트', { fill: PAL.mute }) + '</g>' +
       '<g class="s10-note">' + ART.text(540, 1600, 26, '* 세탁 조건에 따라 효과는 달라질 수 있습니다.', { fill: PAL.mute, weight: 500 }) + '</g>';
@@ -766,6 +1044,12 @@
         };
         el.classList.add('is-watch');
         el.style.setProperty('--s6-watch-dur', S.WATCH_MS + 'ms');
+        /* 시연·힌트 애니메이션이 두 자리를 CSS 에서 받아 간다. 예전에는 키프레임에
+         * 좌표가 박혀 있어서 ART.S6 를 고치면 손과 시트만 옛 자리로 날아갔다. */
+        el.style.setProperty('--s6-home-x', S.HOME.x + 'px');
+        el.style.setProperty('--s6-home-y', S.HOME.y + 'px');
+        el.style.setProperty('--s6-drop-x', S.DROP.x + 'px');
+        el.style.setProperty('--s6-drop-y', S.DROP.y + 'px');
         /* 시연에도 개입과 같은 신호를 같은 순서로 낸다 — 집는 소리, 투입되는 소리.
          * 수행 주체만 다르고 들리는 것은 같아야 한다. */
         Sfx.play('grab');
@@ -903,7 +1187,7 @@
     {
       no: 1,
       title: '목표',
-      dur: 4,
+      dur: DUR[1],
       subtitle: function () {
         return '내일 ' + V.light.use + ' ' + V.light.name + ', 오늘 같이 빨래하기';
       },
@@ -912,7 +1196,7 @@
     {
       no: 2,
       title: '제품 미사용',
-      dur: 5,
+      dur: DUR[2],
       sfx: 'beat',
       subtitle: function () { return '그대로 세탁 시작'; },
       render: function () { return ART.svg(ART.s2({ still: CFG.still !== null }), 'sc2'); }
@@ -920,7 +1204,7 @@
     {
       no: 3,
       title: '실패 진행',
-      dur: 6,
+      dur: DUR[3],
       sfx: 'bad',
       subtitle: function () { return '세탁 중…'; },
       render: function () { return ART.svg(ART.s3({ still: CFG.still !== null }), 'sc3'); }
@@ -928,7 +1212,7 @@
     {
       no: 4,
       title: '실패 결과',
-      dur: 8,
+      dur: DUR[4],
       sfx: 'fail',
       subtitle: function () { return V.light.name + ' 색이 변해 버렸다'; },
       render: function () { return ART.svg(ART.s4({ still: CFG.still !== null }), 'sc4'); }
@@ -1003,7 +1287,7 @@
     {
       no: 7,
       title: '제품 작동',
-      dur: 6,
+      dur: DUR[7],
       sfx: 'beat',
       subtitle: function () { return '떠다니는 염료를 시트가 붙잡아요'; },
       render: function () { return ART.svg(ART.s7({ still: CFG.still !== null }), 'sc7'); }
@@ -1011,7 +1295,7 @@
     {
       no: 8,
       title: '개선 결과',
-      dur: 6,
+      dur: DUR[8],
       sfx: 'success',
       subtitle: function () { return '색은 그대로'; },
       render: function () { return ART.svg(ART.s8({ still: CFG.still !== null }), 'sc8'); }
@@ -1019,7 +1303,7 @@
     {
       no: 9,
       title: '결과 비교',
-      dur: 6,
+      dur: DUR[9],
       sfx: 'beat',
       subtitle: function () { return '시트 하나의 차이'; },
       render: function () { return ART.svg(ART.s9(), 'sc9'); }
@@ -1027,7 +1311,7 @@
     {
       no: 10,
       title: '제품 메시지 + CTA',
-      dur: 8,
+      dur: DUR[10],
       sfx: 'card',
       subtitle: function () { return '세탁 중 이염을 줄여 밝은 옷을 보호하세요'; },
       render: function (ctx) {
@@ -1246,7 +1530,49 @@
       return false;   // 이 조건에는 없는 장면
     },
 
+    /* 자동재생이 막혀 있으면 **광고를 아직 시작하지 않는다.**
+     *
+     * 왜 필요한가
+     *   소리가 막힌 채로 재생이 굴러가면 그 사이 장면의 나래이션은 영영 못 듣는다.
+     *   voice.js 의 재시도는 잠금이 풀린 "그 순간의 장면"만 되살리므로 지나간
+     *   문장은 잃는다. 길이를 나래이션에 맞춰 줄인 뒤로는(INTEGRATION §5-14)
+     *   watch 가 10.8초라 **화면을 한 번 누르는 사이에 광고의 절반이 지나간다.**
+     *
+     * 기다리는 방식이 두 가지인 이유
+     *   러너 안(iframe)에서는 **상한을 둔다.** 시청 조건 참가자는 광고가 끝날
+     *   때까지 화면을 한 번도 안 건드릴 수 있어서, 무한정 기다리면 그 참가자에게는
+     *   광고가 아예 시작되지 않는다. 러너는 참가자가 버튼을 누른 제스처를 들고
+     *   AD_UNLOCK 을 보내므로 실제 실험 경로에서는 이 대기가 거의 0 이다.
+     *
+     *   단독으로 열렸을 때(심사·리허설용 직접 주소)는 **제스처를 기다린다.**
+     *   참가자가 아니라 사람이 확인하는 경로라 안 시작하고 기다리는 편이 낫다 —
+     *   여기서 그냥 시작해 버리면 확인하는 사람이 나래이션을 못 듣는다.
+     *
+     * 소리가 꺼져 있거나(sound=0) 장치가 아예 없으면 기다리지 않는다. */
+    IN_RUNNER: (function () { try { return window.parent !== window; } catch (e) { return true; } })(),
+    AUDIO_WAIT_MS: 2500,
+
+    waitForAudio: function (go) {
+      if (Voice.state() !== 'blocked') return false;   // off · none · on 이면 그냥 간다
+      var self = this;
+      var startedAt = Date.now();
+      var tick = function () {
+        Voice.unlock();
+        Sfx.unlock && Sfx.unlock();
+        if (Voice.state() !== 'blocked') { go(); return; }
+        if (self.IN_RUNNER && Date.now() - startedAt >= self.AUDIO_WAIT_MS) { go(); return; }
+        self.audioTimer = setTimeout(tick, 100);
+      };
+      this.audioTimer = setTimeout(tick, 60);
+      return true;
+    },
+
     start: function () {
+      var self = this;
+      if (!this.audioReady) {
+        if (this.waitForAudio(function () { self.audioReady = true; self.start(); })) return;
+        this.audioReady = true;
+      }
       LOG.t_start = Date.now();
       this.playing = true;
       Sfx.play('start');
@@ -1273,6 +1599,11 @@
       var el = scene.render({ cfg: CFG, ver: V, brand: BRAND, engine: Engine, log: LOG });
       el.classList.add('scene');
       el.dataset.scene = String(scene.no);
+      /* 장면 안의 애니메이션(카메라 밀기·인물·드럼…)은 장면 길이에 맞춰 짜여 있다.
+       * 길이를 나래이션에 맞춰 줄였으므로 애니메이션도 같이 줄어야 중간에 잘리지
+       * 않는다. CSS 는 이 값을 var(--scene-dur) 로 받는다 — 장면 6 이 예전부터
+       * 쓰던 --s6-watch-dur 와 같은 방식이다. */
+      if (scene.dur) el.style.setProperty('--scene-dur', Math.round(scene.dur * 1000) + 'ms');
       dom.layer.appendChild(el);
       // 강제 리플로우 후 페이드 인
       void el.offsetWidth;
@@ -1295,6 +1626,16 @@
        * 스토리보드 캡처는 참가자가 보는 재생이 아니다.
        * 앞 장면 문장이 아직 울리고 있으면 say() 안에서 끊는다. */
       if (CFG.still === null) Voice.say(voiceKey(scene.no));
+
+      /* 자동재생이 막혀 있어 이 문장을 못 읽었더라도, 참가자가 화면을 누르는 순간
+       * 소리가 열리면서 **그때 떠 있는 장면의 문장**을 다시 읽는다. 지나간 문장을
+       * 몰아 읽지는 않는다. */
+      if (Voice.onOpened !== undefined) {
+        var self2 = this;
+        Voice.onOpened = function () {
+          return self2.scene ? voiceKey(self2.scene.no) : null;
+        };
+      }
 
       this.sceneEnteredAt = performance.now();
       this.remaining = scene.dur === null ? Infinity : scene.dur * 1000;

@@ -117,6 +117,19 @@ html, body {
   letter-spacing: -0.01em;
 }
 
+/* --scene-dur — 장면 길이. scenes.js 의 goto() 가 장면 요소에 걸어 준다.
+ *
+ * 장면 길이는 나래이션에 맞춰져 있고(scenes.js 의 DUR 표) 언제든 바뀔 수 있다.
+ * 카메라 밀기·인물 동작처럼 **장면 전체에 걸쳐 한 번 도는** 애니메이션은 여기서
+ * 이 값을 받아야 중간에 잘리지 않는다. 초 단위를 그대로 적어 두면 장면 길이를
+ * 줄이는 순간 카메라가 목적지에 닿기 전에 컷이 난다.
+ *
+ * 괄호 안 옛 값은 fallback 이다 — ?still 캡처처럼 변수가 안 걸리는 경로에서
+ * 예전 길이 그대로 돈다. 전환 연출(cut-*)과 등장 팝(s10-pack·s10-btn-in)은
+ * 장면 길이와 무관한 고정 시간이라 그대로 둔다.
+ * 무한 반복(s3-drift·s7-absorb·s6-ring…)도 마찬가지다.
+ */
+
 /* ---- 장면별 애니메이션 (②단계 플레이스홀더 모션) ----
  *
  * 자극 동일성: OS의 "동작 줄이기(prefers-reduced-motion)" 설정으로 애니메이션
@@ -210,13 +223,14 @@ html, body {
  * 이 장면은 watch·intervene 재생 목록에 모두 있다 — 그래서 여기 넣은 연출은
  * 조건 간 비대칭을 넓히지 않는다. intervene 전용 구간(5~9)에 연출을 더할 때는
  * 그 점을 먼저 따져야 한다. */
+/* 장면 4 는 이제 처음부터 클로즈업이다(하드 컷으로 얼룩에 들어간다). 카메라는
+ * 거기서 아주 조금 더 밀어 정지 화면으로 안 읽히게만 한다 — 예전 값(1 → 1.575배)은
+ * 방 전체 와이드 샷에서 다가가는 움직임이라 지금 구도에서는 옷이 프레임을 넘친다. */
 @keyframes cam-push4 {
-  0%,
-  16%  { transform: translate(0px, 0px) scale(1); animation-timing-function: cubic-bezier(.33, 0, .12, 1); }
-  50%  { transform: translate(-181.5px, -522.5px) scale(1.55); animation-timing-function: linear; }
-  100% { transform: translate(-189.75px, -546.25px) scale(1.575); }
+  0%   { transform: translate(0px, 0px) scale(1); animation-timing-function: cubic-bezier(.33, 0, .12, 1); }
+  100% { transform: translate(-32.4px, -57.6px) scale(1.06); }
 }
-.sc4 .cam { animation: cam-push4 8s both; }
+.sc4 .cam { animation: cam-push4 var(--scene-dur, 8s) both; }
 
 /* 장면 1 인물 — 망설임.
  *
@@ -228,28 +242,9 @@ html, body {
  * 쓰면 인물이 원점으로 튄다 — translate/rotate 개별 속성으로 합성한다. 머리·팔은
  * 새로 만든 <g> 라 속성 transform 이 없지만, 회전 기준을 목·어깨에 두어야 하므로
  * fill-box 를 쓴다. */
-@keyframes fig-look {
-  0%,
-  18%  { rotate: 0deg; }
-  40%  { rotate: -8deg; }     /* 짙은 옷 쪽 */
-  64%  { rotate: 7deg; }      /* 밝은 옷 쪽 */
-  100% { rotate: 1.5deg; }
-}
-@keyframes fig-idle {
-  0%   { translate: 0 0; rotate: 0deg; }
-  55%  { translate: 0 -3px; rotate: -.4deg; }
-  100% { translate: 0 5px; rotate: .5deg; }
-}
-.sc1 .cam .person .head {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;          /* 목 */
-  animation: fig-look 4s cubic-bezier(.45, 0, .3, 1) both;
-}
-.sc1 .cam .person {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;          /* 발밑 */
-  animation: fig-idle 4s ease-in-out both;
-}
+/* 장면 1 의 인물 규칙(고개 돌리기 fig-look · 숨쉬기 fig-idle)은 걷어냈다 —
+ * 장면 1 이 클로즈업이 되면서 인물이 프레임 밖으로 나갔다. 두 옷이 흔들리는
+ * 연출(s1-sway-l · s1-sway-d)이 남아 화면이 정지로 안 읽히게 한다. */
 
 /* 장면 2 인물 — 던지는 뒤따름.
  *
@@ -278,34 +273,24 @@ html, body {
 .sc2 .cam .person .arms {
   transform-box: fill-box;
   transform-origin: 50% 0%;            /* 어깨 */
-  animation: fig-toss-arms 5s cubic-bezier(.3, 0, .35, 1) both;
+  animation: fig-toss-arms var(--scene-dur, 5s) cubic-bezier(.3, 0, .35, 1) both;
 }
 .sc2 .cam .person {
   transform-box: fill-box;
   transform-origin: 50% 100%;
-  animation: fig-toss-body 5s cubic-bezier(.3, 0, .35, 1) both;
+  animation: fig-toss-body var(--scene-dur, 5s) cubic-bezier(.3, 0, .35, 1) both;
 }
 
-/* 장면 4 인물 — 카메라가 다가가는 동안 어깨가 내려앉는다.
+/* 장면 4 의 인물 규칙(어깨 처짐 fig-sag · 고개 젓기 s4-head-deny)은 걷어냈다 —
+ * 장면 4 가 클로즈업이 되면서 인물이 프레임 밖으로 나갔다. 그 자리의 감정은 옷이
+ * 처지는 것(아래 s4-garment-check)이 맡는다.
  *
- * <g class="person"> 에는 이미 transform="translate(x,y)" 속성이 붙어 있다. CSS 의
- * transform 을 쓰면 그 속성을 덮어써 인물이 원점으로 튄다. 그래서 개별 속성
- * translate/rotate 를 쓴다 — 이쪽은 속성 transform 과 합성된다(translate → rotate →
- * transform 순). 회전 기준은 발밑이어야 해서 fill-box 의 아래쪽 가운데로 잡는다. */
-@keyframes fig-sag {
-  0%,
-  19%  { translate: 0 -10px; rotate: 0deg; }
-  49%  { translate: 0 19px; rotate: -1.6deg; }
-  100% { translate: 0 26px; rotate: -2deg; }
-}
-/* .cam 아래에 두는 것이 핵심이다. 정지 화면(?still)에서는 그룹 이름이 cam-still 이라
- * 이 선택자가 아예 안 걸린다 — 앞으로 장면 애니메이션은 전부 .cam 아래에 두면
- * 스토리보드 캡처가 저절로 정지 상태로 남는다. */
-.sc4 .cam .person {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-  animation: fig-sag 8s cubic-bezier(.4, 0, .3, 1) both;
-}
+ * 남겨 둘 교훈 둘.
+ *   ① <g class="person"> 처럼 transform="translate(...)" 속성이 이미 붙은 요소는
+ *      CSS transform 을 쓰면 그 속성을 덮어써 원점으로 튄다. 개별 속성
+ *      translate/rotate 를 쓰면 속성 transform 과 합성된다.
+ *   ② 장면 애니메이션은 전부 .cam 아래에 둔다. 정지 화면(?still)에서는 그룹 이름이
+ *      cam-still 이라 선택자가 아예 안 걸려 스토리보드가 저절로 정지 상태로 남는다. */
 
 /* 장면 1 — 목표(5초). 말풍선이 뜨고 나면 4초 넘게 아무것도 안 변했다.
  * 아주 느리게 밀어 정지 화면으로 안 읽히게만 한다. 자막 읽는 시간은 안 건드린다. */
@@ -313,15 +298,19 @@ html, body {
   0%   { transform: translate(0px, 0px) scale(1); }
   100% { transform: translate(-36px, -90px) scale(1.09); }
 }
-.sc1 .cam { animation: cam-push1 4s linear both; }
+.sc1 .cam { animation: cam-push1 var(--scene-dur, 4s) linear both; }
 
 /* 장면 2 — 제품 미사용(5초). 세탁기 투입구(790,1180) 쪽으로 다가간다.
  * 실패로 들어가기 직전이라 "저기로 들어간다"는 방향감을 준다. */
+/* 장면 2 는 방 전체가 보이는 와이드였고 **위쪽 절반이 빈 벽**이었다. 세로 화면에서
+ * 상단 절반이 죽어 있었다는 뜻이다. 인물과 세탁기가 화면을 채우는 자리에서 시작해
+ * 아주 조금 더 민다. 배율·이동값은 방 배경이 프레임을 다 덮는 범위 안에서 잡았다 —
+ * 넘어가면 가장자리가 투명하게 남는다(장면 6 에서 한 번 겪었다). */
 @keyframes cam-push2 {
-  0%   { transform: translate(0px, 0px) scale(1); animation-timing-function: cubic-bezier(.3, 0, .7, 1); }
-  100% { transform: translate(-98px, -161px) scale(1.14); }
+  0%   { transform: translate(-188px, -545px) scale(1.3); animation-timing-function: cubic-bezier(.3, 0, .7, 1); }
+  100% { transform: translate(-272px, -732px) scale(1.45); }
 }
-.sc2 .cam { animation: cam-push2 5s both; }
+.sc2 .cam { animation: cam-push2 var(--scene-dur, 5s) both; }
 
 /* 장면 10 — 팩샷 + CTA(8초). 여기만 반대로 당긴다. 조금 다가가 있던 화면이
  * 물러나면서 제품·문구·버튼이 차례로 자리를 잡는다. 3.5초 지나면 멈춰서
@@ -331,18 +320,12 @@ html, body {
   44%  { transform: translate(0px, 0px) scale(1); }
   100% { transform: translate(0px, 0px) scale(1); }
 }
-.sc10 .cam { animation: cam-pull10 8s both; }
+.sc10 .cam { animation: cam-pull10 var(--scene-dur, 8s) both; }
 
 /* 1. 말풍선 등장 */
-@keyframes s1-bubble {
-  0%   { opacity: 0; transform: translateY(24px) scale(0.94); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
-}
-.s1-bubble {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-  animation: s1-bubble 700ms 500ms cubic-bezier(.2, .9, .3, 1.2) both;
-}
+/* 말풍선(s1-bubble)도 걷어냈다 — 얼굴이 없는 컷에서 말풍선은 가리킬 대상이 없다.
+ * 담고 있던 문구는 자막이 그대로 갖고 있어 정보량은 안 바뀐다. */
+
 
 /* 2. 옷이 세탁기 안으로 */
 @keyframes s2-toss {
@@ -353,7 +336,7 @@ html, body {
 .s2-toss {
   transform-box: fill-box;
   transform-origin: 50% 50%;
-  animation: s2-toss 3.2s 1.4s ease-in both;
+  animation: s2-toss calc(var(--scene-dur, 5s) * .64) calc(var(--scene-dur, 5s) * .28) ease-in both;
 }
 
 /* 3. 드럼 회전 · 염료 번짐 */
@@ -379,13 +362,13 @@ html, body {
 .s3-tumble {
   transform-box: fill-box;
   transform-origin: 50% 50%;
-  animation: s3-ramp 6s cubic-bezier(.62, 0, .38, 1) both;
+  animation: s3-ramp var(--scene-dur, 6s) cubic-bezier(.62, 0, .38, 1) both;
 }
 /* 염료 번짐은 드럼 램프와 같은 곡선·같은 길이로 간다. 예전엔 5.6초 ease-in 이라
  * 드럼이 25배로 빨라졌다 멎는 동안 저 혼자 제 시계로 번졌다. 이제 드럼이 가장 빠른
  * 한가운데에서 염료도 가장 빠르게 퍼진다(s3-ramp 와 같은 cubic-bezier). */
 @keyframes s3-tint { 0% { opacity: 0; } 100% { opacity: .75; } }
-.s3-tint { animation: s3-tint 6s cubic-bezier(.62, 0, .38, 1) both; }
+.s3-tint { animation: s3-tint var(--scene-dur, 6s) cubic-bezier(.62, 0, .38, 1) both; }
 
 @keyframes s3-drift {
   0%   { opacity: 0; transform: none; }
@@ -451,12 +434,15 @@ html, body {
   transform-origin: 50% 50%;
   pointer-events: none;
 }
+/* 손·시트가 지나는 자리는 ART.S6 의 HOME · DROP 에서 온다(Scene6.attach 가 걸어 준다).
+ * 예전에는 좌표가 키프레임에 박혀 있어서, 시트 자리를 옮기면 손만 옛 자리로 날아갔다.
+ * 괄호 안 폴백은 ART.S6 의 현재 값이다 — 상수를 고치면 여기도 같이 고칠 것. */
 @keyframes s6-hint {
-  0%   { transform: translate(310px, 1600px) scale(1); opacity: 0; }
-  10%  { transform: translate(310px, 1600px) scale(.92); opacity: 1; }
-  62%  { transform: translate(830px, 1250px) scale(1); opacity: 1; }
-  82%  { transform: translate(830px, 1250px) scale(1); opacity: 1; }
-  100% { transform: translate(830px, 1250px) scale(1); opacity: 0; }
+  0%   { transform: translate(calc(var(--s6-home-x, 300px) + 10px), calc(var(--s6-home-y, 1500px) + 100px)) scale(1); opacity: 0; }
+  10%  { transform: translate(calc(var(--s6-home-x, 300px) + 10px), calc(var(--s6-home-y, 1500px) + 100px)) scale(.92); opacity: 1; }
+  62%  { transform: translate(calc(var(--s6-drop-x, 600px) + 40px), calc(var(--s6-drop-y, 880px) + 70px)) scale(1); opacity: 1; }
+  82%  { transform: translate(calc(var(--s6-drop-x, 600px) + 40px), calc(var(--s6-drop-y, 880px) + 70px)) scale(1); opacity: 1; }
+  100% { transform: translate(calc(var(--s6-drop-x, 600px) + 40px), calc(var(--s6-drop-y, 880px) + 70px)) scale(1); opacity: 0; }
 }
 .sc6.hint-on .s6-hand { animation: s6-hint 2.8s ease-in-out infinite; }
 .sc6.hint-on .s6-guide { opacity: .85; transition: opacity 300ms ease; }
@@ -472,11 +458,11 @@ html, body {
   pointer-events: none;
 }
 @keyframes s6-grip-watch {
-  0%   { transform: translate(340px, 1570px); opacity: 0; }
-  8%   { transform: translate(340px, 1570px); opacity: 1; }
-  55%  { transform: translate(860px, 1220px); opacity: 1; }
-  68%  { transform: translate(896px, 1202px); opacity: 0; }
-  100% { transform: translate(896px, 1202px); opacity: 0; }
+  0%   { transform: translate(calc(var(--s6-home-x, 300px) + 70px), calc(var(--s6-home-y, 1500px) + 40px)); opacity: 0; }
+  8%   { transform: translate(calc(var(--s6-home-x, 300px) + 70px), calc(var(--s6-home-y, 1500px) + 40px)); opacity: 1; }
+  55%  { transform: translate(calc(var(--s6-drop-x, 600px) + 70px), calc(var(--s6-drop-y, 880px) + 40px)); opacity: 1; }
+  68%  { transform: translate(calc(var(--s6-drop-x, 600px) + 106px), calc(var(--s6-drop-y, 880px) + 22px)); opacity: 0; }
+  100% { transform: translate(calc(var(--s6-drop-x, 600px) + 106px), calc(var(--s6-drop-y, 880px) + 22px)); opacity: 0; }
 }
 /* 조작 안내 UI — 점선 드롭존 링, 드래그 경로, 힌트 손가락.
    셋 다 "참가자가 조작하라"는 신호이므로 intervene 전용이다. watch에서 이것들이
@@ -488,10 +474,10 @@ html, body {
 /* watch의 시트는 잡을 수 없다 — grab 커서로 조작 가능하다고 오해시키지 않는다 */
 .sc6.is-watch .s6-sheet { cursor: default; }
 @keyframes s6-sheet-watch {
-  0%, 12% { transform: translate(270px, 1530px) scale(1); opacity: 1; }
-  55%     { transform: translate(790px, 1180px) scale(.85); opacity: 1; }
-  66%     { transform: translate(790px, 1180px) scale(.22); opacity: 0; }
-  100%    { transform: translate(790px, 1180px) scale(.22); opacity: 0; }
+  0%, 12% { transform: translate(var(--s6-home-x, 300px), var(--s6-home-y, 1500px)) scale(1); opacity: 1; }
+  55%     { transform: translate(var(--s6-drop-x, 600px), var(--s6-drop-y, 880px)) scale(.85); opacity: 1; }
+  66%     { transform: translate(var(--s6-drop-x, 600px), var(--s6-drop-y, 880px)) scale(.22); opacity: 0; }
+  100%    { transform: translate(var(--s6-drop-x, 600px), var(--s6-drop-y, 880px)) scale(.22); opacity: 0; }
 }
 /* is-watch 는 이제 정지 화면(?still=6)에도 붙는다 — 표시를 끄는 것은 거기서도 필요하기
  * 때문이다. 그래서 시연 애니메이션은 .cam 으로 한 번 더 막는다. 안 그러면 스토리보드가
@@ -737,8 +723,8 @@ html[data-state="ended"] #scene-layer { pointer-events: none; }
   100% { translate: -1px 0; rotate: -.3deg; }
 }
 .sc1 .cam .s1-hold { transform-box: fill-box; transform-origin: 50% 8%; }   /* 손에 닿는 윗변 */
-.sc1 .cam .s1-hold-l { animation: s1-sway-l 4s ease-in-out both; }
-.sc1 .cam .s1-hold-d { animation: s1-sway-d 4s ease-in-out both; }
+.sc1 .cam .s1-hold-l { animation: s1-sway-l var(--scene-dur, 4s) ease-in-out both; }
+.sc1 .cam .s1-hold-d { animation: s1-sway-d var(--scene-dur, 4s) ease-in-out both; }
 
 /* 2. 장면 2 — 자막이 "그대로 세탁 시작"인데 아무것도 시작하지 않았다.
  *
@@ -756,11 +742,11 @@ html[data-state="ended"] #scene-layer { pointer-events: none; }
   96%       { opacity: 1; scale: .995; }
   100%      { opacity: 1; scale: 1; }
 }
-.sc2 .cam .door-open { animation: s2-door-shut 5s linear both; }
+.sc2 .cam .door-open { animation: s2-door-shut var(--scene-dur, 5s) linear both; }
 .sc2 .cam .door-closed {
   transform-box: fill-box;
   transform-origin: 50% 50%;
-  animation: s2-door-seal 5s cubic-bezier(.3, 0, .2, 1) both;
+  animation: s2-door-seal var(--scene-dur, 5s) cubic-bezier(.3, 0, .2, 1) both;
 }
 /* 다이얼을 한 칸 돌리고 표시등이 들어온다 — "코스를 골라 눌렀다" */
 @keyframes s2-dial {
@@ -776,9 +762,9 @@ html[data-state="ended"] #scene-layer { pointer-events: none; }
 .sc2 .cam .w-dial {
   transform-box: fill-box;
   transform-origin: 50% 62%;           /* 손잡이 축 */
-  animation: s2-dial 5s cubic-bezier(.2, 1.4, .4, 1) both;
+  animation: s2-dial var(--scene-dur, 5s) cubic-bezier(.2, 1.4, .4, 1) both;
 }
-.sc2 .cam .w-led-a { animation: s2-led-on 5s linear both; }
+.sc2 .cam .w-led-a { animation: s2-led-on var(--scene-dur, 5s) linear both; }
 
 /* 3. 장면 3 — 6초 동안 카메라가 한 번도 안 움직인 유일한 공통 장면이었다.
  *
@@ -795,7 +781,7 @@ html[data-state="ended"] #scene-layer { pointer-events: none; }
   50%  { transform: translate(-27px, -50px) scale(1.10); animation-timing-function: cubic-bezier(.5, 0, .6, 1); }
   100% { transform: translate(-32px, -60px) scale(1.12); }
 }
-.sc3 .cam { animation: cam-push3 6s both; }
+.sc3 .cam { animation: cam-push3 var(--scene-dur, 6s) both; }
 
 @keyframes s3-shudder {
   0%, 100% { translate: 0 0; }
@@ -812,7 +798,7 @@ html[data-state="ended"] #scene-layer { pointer-events: none; }
 .sc3 .cam .drum-body {
   transform-box: fill-box;
   transform-origin: 50% 50%;
-  animation: s3-shudder 6s linear both;
+  animation: s3-shudder var(--scene-dur, 6s) linear both;
 }
 
 /* 4. 장면 4 — 카메라가 얼룩으로 다가가는 8초 동안 인물은 어깨만 내려앉았다.
@@ -828,28 +814,18 @@ html[data-state="ended"] #scene-layer { pointer-events: none; }
  * 장면 4 는 watch·intervene 이 함께 보는 마지막 장면이고 이 광고의 전환점이다. */
 @keyframes s4-garment-check {
   0%, 14%  { translate: 0 0; rotate: 0deg; }
-  24%      { translate: -4px -9px; rotate: -1.4deg; }   /* 눈앞으로 당긴다 */
-  38%      { translate: -1px -3px; rotate: .6deg; }
-  60%      { translate: 1px 4px; rotate: -.4deg; }      /* 힘이 빠져 내려온다 */
-  100%     { translate: 2px 7px; rotate: -.8deg; }
+  24%      { translate: -14px -40px; rotate: -.7deg; }  /* 눈앞으로 당긴다 */
+  38%      { translate: -4px -14px; rotate: .3deg; }
+  60%      { translate: 5px 20px; rotate: -.2deg; }     /* 힘이 빠져 내려온다 */
+  100%     { translate: 8px 34px; rotate: -.4deg; }
 }
 .sc4 .cam .hold-garment {
   transform-box: fill-box;
   transform-origin: 50% 0%;            /* 손에 잡힌 윗변 */
-  animation: s4-garment-check 8s cubic-bezier(.35, 0, .3, 1) both;
+  animation: s4-garment-check var(--scene-dur, 8s) cubic-bezier(.35, 0, .3, 1) both;
 }
-@keyframes s4-head-deny {
-  0%, 40%  { rotate: 0deg; }
-  52%      { rotate: -5deg; }
-  64%      { rotate: 4deg; }
-  76%      { rotate: -2.5deg; }
-  100%     { rotate: -1deg; }
-}
-.sc4 .cam .person .head {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;          /* 목 */
-  animation: s4-head-deny 8s cubic-bezier(.4, 0, .35, 1) both;
-}
+/* 고개 젓기(s4-head-deny)는 걷어냈다 — 장면 4 가 클로즈업이 되면서 얼굴이 프레임
+ * 밖으로 나갔다. 그 자리의 감정은 이제 옷이 처지는 것(s4-garment-check)이 맡는다. */
 
 /* 10. 장면 10 — 카메라가 물러나는 동안 팩샷만 움직이고 글자는 그냥 거기 있었다.
  *
@@ -873,14 +849,29 @@ html[data-state="ended"] #scene-layer { pointer-events: none; }
   transform-box: fill-box;
   transform-origin: 50% 50%;
 }
-.sc10 .cam .s10-name { animation: s10-rise 620ms 700ms cubic-bezier(.16, .9, .3, 1) both; }
+.sc10 .cam .s10-name { animation: s10-rise 620ms calc(var(--scene-dur, 8s) * .0875) cubic-bezier(.16, .9, .3, 1) both; }
+
+/* 제품명을 스치는 빛 — 광고에서 제품 이름이 한 번 반짝이는 그 문법이다.
+ *
+ * 한 번만 돈다. 무한 반복으로 두면 카드가 화면에 있는 시간에 따라 반짝인 횟수가
+ * 갈리는데, 지금 세탁 카드는 3.07초고 게임 카드는 8초다 — 같은 규칙을 넣어도
+ * 게임 쪽이 두 배 넘게 반짝인다. 한 번으로 두면 두 자극이 정확히 한 번씩이다.
+ *
+ * 지연·길이는 게임 자극(main.css 의 pc-sheen)과 같은 값이다. 제품명이 뜨는 것은
+ * 세탁이 0.89초·게임이 즉시라 카드 등장 자체는 이미 다르지만(§5-13), 빛이 스치는
+ * 시점만은 양쪽 다 카드가 뜨고 1초다. */
+@keyframes s10-sheen {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(620px); }
+}
+.sc10 .cam .s10-sheen { animation: s10-sheen 900ms 1000ms cubic-bezier(.3, 0, .3, 1) both; }
 .sc10 .cam .s10-rule {
   transform-box: fill-box;
   transform-origin: 50% 50%;
-  animation: s10-rule-draw 520ms 1180ms cubic-bezier(.2, .8, .3, 1) both;
+  animation: s10-rule-draw 520ms calc(var(--scene-dur, 8s) * .1475) cubic-bezier(.2, .8, .3, 1) both;
 }
-.sc10 .cam .s10-sub  { animation: s10-rise 620ms 1420ms cubic-bezier(.16, .9, .3, 1) both; }
-.sc10 .cam .s10-note { animation: s10-rise 620ms 2200ms cubic-bezier(.16, .9, .3, 1) both; }
+.sc10 .cam .s10-sub  { animation: s10-rise 620ms calc(var(--scene-dur, 8s) * .1775) cubic-bezier(.16, .9, .3, 1) both; }
+.sc10 .cam .s10-note { animation: s10-rise 620ms calc(var(--scene-dur, 8s) * .275) cubic-bezier(.16, .9, .3, 1) both; }
 
 /* ---- 광고 닫기 [×] (장면 10) ----
  *

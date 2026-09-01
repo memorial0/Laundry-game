@@ -27,7 +27,8 @@ function render(ver) {
     if (n === 6) {
       // 장면 6은 위치를 CSS가 잡는다 → 정지 렌더용으로 좌표를 박아 넣는다
       body = body
-        .replace('style="transform:translate(270px,1530px)"', 'transform="translate(270,1530)"')
+        /* 좌표를 박아 두면 ART.S6.HOME 을 옮길 때 스토리보드만 옛 자리로 남는다 */
+        .replace(/style="transform:translate\((-?[\d.]+)px,(-?[\d.]+)px\)"/, 'transform="translate($1,$2)"')
         .replace('<g class="s6-hand">', '<g class="s6-hand" transform="translate(310,1600)">')
         .replace('<g class="s6-grip">', '<g class="s6-grip" transform="translate(340,1570)">');
     }
