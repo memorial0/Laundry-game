@@ -65,13 +65,31 @@ module.exports = async function () {
     '모든 문장에 소리가 붙어 있다');
 
   /* ---- 장면 길이 안에 들어간다 ---- */
-  const DUR = { 1: 4, 2: 5, 3: 6, 4: 8, 7: 6, 8: 6, 9: 6, 10: 8 };  // 5·6 은 가변
+  const DUR = { 1: 2.94, 2: 1.58, 3: 1.16, 4: 2.08, 7: 2.44, 8: 1.29, 9: 1.63, 10: 3.07 };  // 5·6 은 가변
   const over = have.filter(k => {
     const no = Number(k.replace(/^s(\d+).*$/, '$1'));
     return DUR[no] !== undefined && table.sec[k] > DUR[no];
   });
   t.ok(over.length === 0, '클립이 장면보다 길지 않다 (말이 끊기지 않는다)',
     over.map(k => `${k} ${table.sec[k]}s`));
+
+  /* ---- 말이 끝나면 바로 넘어간다 ----
+   *
+   * 예전에는 위의 "길지 않다"만 봤다. 그래서 0.86초 말하고 6초짜리 장면에 서 있어도
+   * 통과했고, 실제로 장면 3 이 그랬다(빈 시간 5.14초). 이제 장면 길이가 클립에
+   * 붙어 있는지까지 본다 — scenes.js 의 DUR 표는 손으로 적은 값이라, 클립을 다시
+   * 구워 길이가 달라지면 여기서 어긋난다.
+   *
+   * A·B 가 갈리는 장면(1·4)은 긴 쪽에 맞춰져 있으므로(SPEC 7장의 길이 동일 요건)
+   * 짧은 쪽은 그 차이만큼 여유가 더 있다 — 0.06초다. 그래서 위 여유를 본다. */
+  const TAIL = 0.3, SLACK = 0.1;
+  const gap = k => DUR[Number(k.replace(/^s(\d+).*$/, '$1'))] - table.sec[k];
+  const loose = have.filter(k => {
+    const no = Number(k.replace(/^s(\d+).*$/, '$1'));
+    return DUR[no] !== undefined && gap(k) > TAIL + SLACK;
+  });
+  t.ok(loose.length === 0, `말 끝나고 ${TAIL}초 안에 컷 (빈 시간이 남지 않는다)`,
+    loose.map(k => `${k} +${gap(k).toFixed(2)}s`));
 
   /* ---- 장면마다 말투가 다르다 ---- */
   /* 처음 구웠을 때는 열세 문장이 전부 같은 톤·같은 속도였다(F0 가 227~259Hz 한
@@ -163,6 +181,108 @@ module.exports = async function () {
   await wait(120);
   t.ok(still.AD_VOICE.spoken === 0,
     '?still 스토리보드 캡처에서는 읽지 않는다', still.AD_VOICE.spoken);
+
+  /* ---- 자동재생이 막혔다가 풀리는 경우 ----
+   *
+   * 이 구간이 검사에서 통째로 비어 있었다. 다른 검사는 전부 jsdom(AudioContext 없음)
+   * 이라 "소리가 안 나도 자극은 돈다"만 봤고, **소리가 실제로 나는 경로**는 아무도
+   * 안 봤다. 그래서 다음이 통과한 채로 나갔다:
+   *   장면에 들어갈 때 막혀 있으면 그 문장은 **버려지고 재시도가 없었다.**
+   * 광고가 31초일 때는 여덟 문장이 흘러 늦게 눌러도 대부분 들렸지만, 길이를
+   * 10.8초로 줄이자 화면을 한 번 누르는 사이에 광고가 끝났다.
+   *
+   * 여기서는 가짜 AudioContext 로 "막힘 → 풀림"을 그대로 재현한다. */
+  t.section('막혔다가 풀리면 지금 장면을 다시 읽는다');
+
+  /* sfx.js 도 같은 window.AudioContext 를 쓴다 — 목소리만 보려는 mock 이지만
+   * 효과음이 부르는 노드까지 갖춰야 장면 전환이 예외로 멈추지 않는다. */
+  const mockAudio = (win) => {
+    const P = function (v) { this.value = v === undefined ? 1 : v; };
+    P.prototype.cancelScheduledValues = P.prototype.setValueAtTime =
+      P.prototype.linearRampToValueAtTime = P.prototype.exponentialRampToValueAtTime =
+      P.prototype.setTargetAtTime = function () {};
+    const node = () => ({
+      connect() {}, disconnect() {}, start() {}, stop() {},
+      gain: new P(), frequency: new P(440), detune: new P(0), Q: new P(1),
+      threshold: new P(-24), knee: new P(30), ratio: new P(12),
+      attack: new P(0.003), release: new P(0.25), type: 'sine', buffer: null, onended: null
+    });
+    win.AudioContext = function () {
+      this.state = 'suspended';            // 자동재생 정책에 막힌 상태로 시작
+      this.currentTime = 0;
+      this.sampleRate = 44100;
+      this.destination = {};
+      const self = this;
+      this.createGain = node;
+      this.createOscillator = node;
+      this.createBiquadFilter = node;
+      this.createDynamicsCompressor = node;
+      this.createBuffer = () => ({ getChannelData: () => new Float32Array(256), duration: 1 });
+      /* 목소리만 센다 — 나래이션 버퍼에만 표시를 달아 효과음과 갈라낸다 */
+      this.createBufferSource = () => {
+        const n = node();
+        n.start = function () { if (n.buffer && n.buffer.__voice) win.__played++; };
+        return n;
+      };
+      /* 실제 브라우저의 자동재생 정책 — 제스처가 없으면 resume() 이 안 먹는다.
+       * 이걸 흉내내지 않으면 mock 이 저 혼자 풀려서 "막힌 상태"를 못 만든다. */
+      this.resume = function () {
+        if (win.__gesture) self.state = 'running';
+        return Promise.resolve();
+      };
+      this.decodeAudioData = function (buf, ok) {
+        const b = { duration: 1, __voice: true };
+        if (ok) ok(b);
+        return Promise.resolve(b);
+      };
+    };
+    win.__played = 0;
+    win.__gesture = false;
+  };
+
+  const v = bootPage('?mode=watch&ver=A&sid=v-unlock');
+  await wait(120);
+  mockAudio(v);                                   // ctx() 는 부를 때 window 를 읽는다
+  v.AD_ENGINE.gotoNo(3);                          // "세탁 중…" — 막혀 있어서 못 읽는다
+  await wait(40);
+  t.ok(v.AD_VOICE.state() === 'blocked', '막혀 있으면 state = blocked', v.AD_VOICE.state());
+  t.ok(v.__played === 0, '막혀 있는 동안은 소리가 안 난다', v.__played);
+  const spokenBefore = v.AD_VOICE.spoken;
+
+  v.__gesture = true;                             // 참가자가 화면을 누른다
+  v.AD_VOICE.unlock();
+  await wait(60);
+  t.ok(v.AD_VOICE.state() === 'on', '풀리면 state = on', v.AD_VOICE.state());
+  t.ok(v.__played === 1, '풀리는 순간 지금 장면 문장을 읽는다', v.__played);
+  t.ok(v.AD_VOICE.spoken === spokenBefore,
+    '다시 읽은 것은 VOICE_SPOKEN 을 늘리지 않는다 (같은 문장이다)',
+    { before: spokenBefore, after: v.AD_VOICE.spoken });
+
+  v.AD_ENGINE.gotoNo(4);                          // 풀린 뒤에는 그냥 읽힌다
+  await wait(40);
+  t.ok(v.__played === 2, '풀린 뒤 장면들은 그대로 읽힌다', v.__played);
+
+  /* ---- 막혀 있으면 광고를 아직 시작하지 않는다 ----
+   *
+   * 재시도만으로는 부족했다. 잠금이 풀린 "그 순간의 장면"만 되살아나므로 그전에
+   * 지나간 문장은 그대로 잃는다. watch 가 10.8초라 화면을 한 번 누르는 사이에
+   * 광고의 절반이 지나간다 — 그래서 소리가 정해질 때까지 시작을 미룬다. */
+  t.section('소리가 막혀 있으면 시작을 미룬다');
+
+  /* 스크립트가 붙기 전에 AudioContext 를 심어야 boot() 가 막힌 상태를 본다 */
+  const g = bootPage('?mode=watch&ver=A&sid=v-gate', { before: mockAudio });
+  await wait(300);
+  const gated = g.AD_ENGINE && g.AD_ENGINE.scene === null || !g.AD_ENGINE.playing;
+  t.ok(gated, '막혀 있는 동안 재생이 시작되지 않는다',
+    { playing: g.AD_ENGINE.playing, scene: g.AD_ENGINE.scene && g.AD_ENGINE.scene.no });
+
+  g.__gesture = true;                             // 확인하는 사람이 화면을 누른다
+  g.AD_VOICE.unlock();
+  await wait(250);
+  t.ok(g.AD_ENGINE.playing && g.AD_ENGINE.scene && g.AD_ENGINE.scene.no === 1,
+    '풀리면 장면 1 부터 시작한다',
+    { playing: g.AD_ENGINE.playing, scene: g.AD_ENGINE.scene && g.AD_ENGINE.scene.no });
+  t.ok(g.__played >= 1, '장면 1 나래이션을 놓치지 않는다', g.__played);
 
   /* ---- 로그에 남는다 ---- */
   t.section('로그에 남는다');

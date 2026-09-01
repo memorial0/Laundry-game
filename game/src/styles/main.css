@@ -358,6 +358,49 @@ small {
   font-weight: 800;
   letter-spacing: 0.03em;
   color: var(--primary);
+  position: relative;
+}
+
+/* 제품명을 스치는 빛 — 세탁 자극 장면 10 의 s10-sheen 과 짝이다.
+ *
+ * 왜 양쪽에 같이 넣나. 제품명이 한쪽에서만 반짝이면 그 차이가 제품 평가(블록 D)로
+ * 그대로 들어간다. 세탁은 SVG, 게임은 DOM 이라 그리는 방법은 다르지만 **지연 1초 ·
+ * 길이 0.9초 · 한 번만** 세 값을 맞춘다.
+ *
+ * 한 번만 도는 이유. 무한 반복이면 카드가 떠 있는 시간에 반짝인 횟수가 비례하는데
+ * 게임 카드는 8초, 세탁 카드는 3.07초다(INTEGRATION.md §5-14). 한 번으로 못 박으면
+ * 카드 길이가 달라도 반짝임은 정확히 한 번씩이다. */
+/* 빛은 **글자에만** 걸린다. 띠를 이름의 네모 칸 위로 그냥 지나가게 두면 이 카드가
+ * 어두워서(#0b3a56 → #02101c) 배경까지 하얗게 밀려 커다란 흰 줄이 지나간다.
+ * 세탁 쪽 카드는 연한 민트라 같은 띠가 글자만 밝히고 배경은 거의 안 변한다 —
+ * 같은 값을 넣어도 **눈에 띄는 정도가 반대로 갈린다.** 그래서 세탁이 SVG 클립으로
+ * 글자 모양을 오려 내는 것과 같게, 여기서는 background-clip 으로 오려 낸다.
+ *
+ * 가상 요소가 같은 글자(data-name)를 겹쳐 그리고 글자 안쪽만 그라디언트로 채운다.
+ * 아래 진짜 글자는 그대로 있으므로, 혹시 background-clip:text 가 안 먹는 환경이어도
+ * 이름이 사라지지는 않는다. */
+@keyframes pc-sheen {
+  0%   { background-position: 150% 0; }
+  100% { background-position: -50% 0; }
+}
+
+.pc-name::after {
+  content: attr(data-name);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  pointer-events: none;
+  color: transparent;
+  background-image: linear-gradient(104deg,
+    rgba(255, 255, 255, 0) 42%,
+    rgba(255, 255, 255, 0.9) 50%,
+    rgba(255, 255, 255, 0) 58%);
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: pc-sheen 900ms 1000ms cubic-bezier(.3, 0, .3, 1) both;
 }
 
 .pc-rule {

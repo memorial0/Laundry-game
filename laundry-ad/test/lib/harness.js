@@ -24,13 +24,20 @@ const VOICE = fs.readFileSync(path.join(APP_DIR, 'voice.js'), 'utf8');
 const STRIP = /<script src="(sfx|voice-clips|voice|scenes)\.js"><\/script>/g;
 
 /** 실제 페이지를 띄운다. window.__messages 에 postMessage 수신분이 쌓인다. */
-function bootPage(query) {
+/**
+ * @param {string} [query] 주소 뒤에 붙일 질의문자열
+ * @param {object} [opts]  { before(window) } — **스크립트가 붙기 전에** 부른다.
+ *   가짜 AudioContext 처럼 자극이 부팅하면서 읽는 것을 미리 심을 때 쓴다.
+ *   부팅 뒤에 심으면 이미 지나간 판단(자동재생이 막혔는지)을 못 바꾼다.
+ */
+function bootPage(query, opts) {
   const dom = new JSDOM(HTML.replace(STRIP, ''), {
     url: 'http://localhost/' + (query || ''),
     pretendToBeVisual: true,
     runScripts: 'dangerously'
   });
   const { window } = dom;
+  if (opts && typeof opts.before === 'function') opts.before(window);
   window.__errors = [];
   window.__messages = [];
   window.addEventListener('error', e => window.__errors.push(e.error));

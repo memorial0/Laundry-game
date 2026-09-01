@@ -1208,7 +1208,9 @@ const MicrogateExperiment = () => {
                       strokeWidth="3" strokeLinecap="round" opacity="0.55" />
                   </svg>
                 </div>
-                <p className="pc-name">{APP.name}</p>
+                {/* data-name 은 이름을 스치는 빛이 쓴다 — 가상 요소가 같은 글자를 겹쳐 그리고
+                    그 글자 모양으로만 그라디언트를 오려 낸다(main.css 의 pc-sheen). */}
+                <p className="pc-name" data-name={APP.name}>{APP.name}</p>
                 <div className="pc-rule" />
                 <p className="pc-genre">{APP.genre}</p>
                 <p className="pc-msg">{APP.message}</p>

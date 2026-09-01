@@ -3,8 +3,10 @@
  *
  * 다른 테스트는 Engine.gotoNo()로 장면을 점프해 구조를 검사한다. 이 스크립트는
  * 점프하지 않고 타이머가 실제로 흐르게 두어 SPEC 3장의 장면 길이를 실측한다.
- *   watch      31초 고정        (장면 1·2·3·4·10)
- *   intervene  55초 고정 + 장면 6 조작 시간
+ *   watch      10.8초 고정      (장면 1·2·3·4·10)
+ *   intervene  22.2초 고정(되감기 6초 포함) + 되돌리기 대기 + 장면 6 조작 시간
+ *
+ *   장면 길이는 나래이션 클립 + 0.3초다(scenes.js 의 DUR 표). 말이 끝나면 컷이다.
  * 느리므로(4조건 약 60초) npm test에는 넣지 않는다. 조건 4개는 동시에 재생한다.
  *
  * 예:  node test/timing.js              4조건 전부
@@ -18,14 +20,15 @@ const { bootPage, wait, dragSheet, suite } = require('./lib/harness');
 /* null = 길이가 정해져 있지 않은 장면(참가자에게 달렸다).
  *   5 — [되돌리기]를 누를 때까지 대기 + 누른 뒤 되감기 6초
  *   6 — 시트를 넣을 때까지 대기 */
-const DUR = { 1: 4, 2: 5, 3: 6, 4: 8, 5: null, 6: null, 7: 6, 8: 6, 9: 6, 10: 8 };
+const DUR = { 1: 2.94, 2: 1.58, 3: 1.16, 4: 2.08, 5: null, 6: null, 7: 2.44, 8: 1.29, 9: 1.63, 10: 3.07 };
 const PLAYLIST = { watch: [1, 2, 3, 4, 10], intervene: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] };
 
 const HOME = { x: 270, y: 1530 };   // 시트 처음 위치 (ART.S6.HOME)
 const DROP = { x: 790, y: 1180 };   // 투입구       (ART.S6.DROP)
 
 const POLL = 50;          // 장면 전환 감지 간격(ms) — 측정 오차의 하한이다
-const TOL = 0.6;          // 허용 오차(초). 타이머 지터 + POLL을 넉넉히 덮는다
+const TOL = 0.4;          // 허용 오차(초). 타이머 지터 + POLL을 넉넉히 덮는다
+                          // (장면이 1.2초까지 짧아져 0.6초는 장면 길이의 절반이었다)
 const S6_THINK = 2000;    // 장면 6 진입 후 드롭까지 기다리는 시간(ms) — 참가자 조작 흉내
 const S5_THINK = 1200;    // 장면 5 진입 후 [되돌리기]를 누르기까지(ms) — 참가자 반응 흉내
 const REWIND_MS = 6000;   // 누른 뒤 되감기 애니메이션 길이(ms). scenes.js 와 같은 값이어야 한다
@@ -105,8 +108,13 @@ function report(t, r) {
       '장면 ' + s.no + ' 길이 ' + spec + 's', s.sec.toFixed(2) + 's');
   }
   /* intervene 의 고정분은 장면 5·6 을 뺀 값이다(둘 다 참가자에게 달려 있다).
-   * 예전 55초에는 장면 5 의 6초가 포함돼 있었다 — 되감기를 광고가 알아서 했기 때문이다. */
-  t.ok(fixed === (isInt ? 49 : 31), '고정분 합계 ' + (isInt ? 49 : 31) + 's', fixed + 's');
+   * 예전 55초에는 장면 5 의 6초가 포함돼 있었다 — 되감기를 광고가 알아서 했기 때문이다.
+   * 합계는 DUR 표에서 그대로 나오는 값이라 손으로 적지 않는다 — 장면 하나를 고칠
+   * 때마다 여기 숫자까지 같이 고쳐야 했고, 그러면 표와 어긋난 채 통과할 길이 생긴다. */
+  const EXPECT = Object.entries(DUR)
+    .filter(([no, d]) => d !== null && (isInt || PLAYLIST.watch.includes(Number(no))))
+    .reduce((a, [, d]) => a + d, 0);
+  t.ok(Math.abs(fixed - EXPECT) < 0.005, '고정분 합계 ' + EXPECT.toFixed(2) + 's', fixed.toFixed(2) + 's');
 
   // 로그가 실측과 맞는지
   const total = spans.reduce((a, s) => a + s.sec, 0);
