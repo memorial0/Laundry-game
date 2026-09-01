@@ -35,10 +35,6 @@
   /* 7점 동의 척도의 눈금 라벨 — 1·4·7 에만 글자가 붙는다 (제시용 전문 그대로) */
   var LIKERT_TICKS = { 1: '전혀 그렇지 않다', 4: '보통이다', 7: '매우 그렇다' };
 
-  /* 비게임 앱 카테고리 — 예비조사를 거쳐 자극과 함께 확정한다.
-   * 문항 구조·선택지는 바뀌지 않으므로 이 상수만 갈아 끼우면 된다.
-   * 확정 전에는 validate() 가 경고한다. */
-  var NONGAME_CATEGORY = '[비게임 앱 카테고리]';
 
   /* ---------- 하위척도 ----------
    * 노력·짜증은 점수가 높을수록 부정적인 구성개념이다. 역문항이 아니라 척도 자체가 그렇다 —
@@ -49,7 +45,7 @@
     { key: '통제감',        label: '통제감',            items: ['통제감1', '통제감2', '통제감3', '통제감4'] },
     { key: '짜증',          label: '짜증·성가심',        items: ['짜증1', '짜증2', '짜증3'] },
     { key: '광고태도',      label: '광고에 대한 태도',   items: ['광고태도1', '광고태도2', '광고태도3'] },
-    { key: '제품태도',      label: '제품(앱)에 대한 태도', items: ['제품태도1', '제품태도2', '제품태도3', '제품태도4'] },
+    { key: '제품태도',      label: '제품에 대한 태도', items: ['제품태도1', '제품태도2', '제품태도3', '제품태도4'] },
     { key: '이용의도',      label: '이용 의향',          items: ['이용의도1', '이용의도2', '이용의도3'] },
     { key: '조작점검_실패', label: '조작 점검 — 실패 제시', items: ['조작점검_실패1', '조작점검_실패2', '조작점검_실패3'] },
     { key: '조작점검_개입', label: '조작 점검 — 개입 가능', items: ['조작점검_개입1', '조작점검_개입2', '조작점검_개입3'] }
@@ -89,15 +85,23 @@
    * 안 밝히지만 이건 밝혀도 조작이 새지 않고, 실재하는 제품으로 믿게 두는 쪽이 더 나쁘다.
    * ========================================================== */
 
-  /* 연구책임자·심의기관 정보 — 기관마다 다르므로 상수로 뺀다.
-   * 대괄호가 남아 있으면 validate() 가 경고한다(NONGAME_CATEGORY 와 같은 방식). */
+  /* 연구담당자·연구책임자·심의기관 정보 — 기관마다 다르므로 상수로 뺀다.
+   * 대괄호가 남아 있으면 validate() 가 경고한다(NONGAME_CATEGORY 와 같은 방식).
+   * 값은 전부 문자열로 둔다 — validate() 가 값을 훑어 대괄호를 찾는다. */
   var CONTACT = {
-    pi: '[연구책임자 이름]',
-    affil: '[소속 · 학과]',
-    phone: '[연구책임자 연락처]',
-    email: '[연구책임자 이메일]',
-    irb: '[기관생명윤리위원회(IRB) 연락처]'
+    staff: '심현수 연구원',
+    staffPhone: '010-2912-4505',
+    pi: '김우주 조교수',
+    piPhone: '033-250-7653',
+    irb: '강원대학교 생명윤리위원회 (☎033-250-6063)'
   };
+
+  /* 동의서와 디브리핑이 같은 문장을 쓴다 — 두 곳에 따로 적어 두면 한쪽만 고치게 된다 */
+  var CONTACT_LINES = [
+    '문의사항이 있으신 분은 연구담당자 ' + CONTACT.staff + '(' + CONTACT.staffPhone +
+      ') 또는 연구책임자 ' + CONTACT.pi + '(' + CONTACT.piPhone + ')에게 연락 바랍니다.',
+    '연구 참여자로서의 권리에 대한 문의: ' + CONTACT.irb
+  ];
 
   var CONSENT = {
     title: '연구 참여 동의서',
@@ -135,9 +139,7 @@
             '그만두고 싶으시면 답을 멈추고 연구원에게 말씀해 주시면 됩니다.',
             '마지막 설명을 들으신 뒤에도 자료를 쓰지 말아 달라고 하실 수 있습니다. 그때까지 응답하신 ' +
             '내용은 사용하지 않고 폐기합니다.'] },
-      { h: '문의할 곳',
-        p: ['연구책임자 ' + CONTACT.pi + ' (' + CONTACT.affil + ') · ' + CONTACT.phone + ' · ' + CONTACT.email,
-            '연구 참여자로서의 권리에 대한 문의: ' + CONTACT.irb] }
+      { h: '문의할 곳', p: CONTACT_LINES }
     ],
     /* 체크는 세 갈래로 나눈다. 한 줄로 묶으면 읽었는지·이해했는지·동의하는지가 한 번의 클릭에
      * 뭉쳐서, 무엇에 동의한 것인지 참가자도 기록도 구분하지 못한다. */
@@ -157,9 +159,13 @@
    * 2. 사전 문항 (동의 취득 직후 · 광고 제시 전 · 3문항)
    * ========================================================== */
 
+  /* 정본의 안내문은 '평소 생활 습관에 대한' 이다. 실패 광고 노출 빈도 문항을 되살리면서
+   * '광고 경험'을 덧댔다 — 세 문항 중 하나가 생활 습관이 아니라 광고를 얼마나 접했는지를
+   * 묻기 때문이다. 안내문이 화면에 있는 문항을 다 덮지 못하면 참가자가 무엇을 답하는
+   * 자리인지 헷갈린다. 이 문항을 다시 빼면 안내문도 정본 문장으로 되돌릴 것. */
   var PRE_INSTRUCTION =
-    '설문에 참여해 주셔서 감사합니다. 먼저 평소 앱 이용과 광고 경험에 대한 간단한 질문에 ' +
-    '답해 주십시오.';
+    '설문에 참여해 주셔서 감사합니다. 먼저 평소 생활 습관과 광고 경험에 대한 ' +
+    '간단한 질문에 답해 주십시오.';
 
   var FREQ_OPTIONS = ['전혀 안 함', '월 1회 이하', '월 2–3회', '주 1회', '주 2–3회', '거의 매일'];
 
@@ -193,8 +199,14 @@
             '모바일 앱 광고(이하 ‘실패 광고’)를 얼마나 자주 접하십니까?' },
     { id: '사전_게임앱빈도', type: 'choice', options: FREQ_OPTIONS,
       stem: '귀하는 모바일 게임(게임 앱)을 얼마나 자주 이용하십니까?' },
-    { id: '사전_비게임앱빈도', type: 'choice', options: FREQ_OPTIONS,
-      stem: '귀하는 ' + NONGAME_CATEGORY + ' 앱을 얼마나 자주 이용하십니까?' }
+    /* 비게임 제품군(세탁)에 대한 **영역 친숙도**다. 게임 앱 이용 빈도와 같은 6점
+     * 구간 척도를 쓴다 — 두 제품군의 친숙도를 같은 자로 재야 비교가 성립한다.
+     *
+     * 예전에는 '[비게임 앱 카테고리] 앱을 얼마나 자주 이용하십니까?' 였다. 비게임
+     * 자극이 이염 방지 세탁 시트라 **앱이 아니고**, 물어야 하는 것도 앱 이용 빈도가
+     * 아니라 세탁이라는 행위를 얼마나 하는지다. */
+    { id: '사전_세탁빈도', type: 'choice', options: FREQ_OPTIONS,
+      stem: '귀하는 세탁(빨래)을 얼마나 자주 직접 하십니까?' }
   ];
 
   /* ==========================================================
@@ -260,8 +272,8 @@
       ]
     },
     {
-      key: 'D', title: '이 제품(앱)에 대한 전반적인 평가',
-      instruction: '이번에는 광고가 아니라, 광고에 나온 <b>제품(앱)</b> 자체에 대해 표시해 주십시오.',
+      key: 'D', title: '이 제품에 대한 전반적인 평가',
+      instruction: '이번에는 광고가 아니라, 광고에 나온 <b>제품</b> 자체에 대해 표시해 주십시오.',
       items: [
         { id: '제품태도1', sub: '제품태도', type: 'sd', poles: ['마음에 안 든다', '마음에 든다'] },
         { id: '제품태도2', sub: '제품태도', type: 'sd', poles: ['부정적이다', '긍정적이다'] },
@@ -273,9 +285,26 @@
       key: 'E', title: '이용 의향',
       instruction: '',
       items: [
-        { id: '이용의도1', sub: '이용의도', type: 'likert', stem: '나는 이 앱을 다운로드할 의향이 있다' },
-        { id: '이용의도2', sub: '이용의도', type: 'likert', stem: '나는 이 앱을 사용해 볼 의향이 있다' },
-        { id: '이용의도3', sub: '이용의도', type: 'likert', stem: '이 광고를 보고 나니 이 앱을 한번 사용해 보고 싶다' }
+        /* 이 세 문항만 **광고된 제품군에 따라 대상 명사가 바뀐다**(정본 섹션 E 각주).
+         * 구성개념과 척도는 같고 명사·동사만 갈리며, 화면에는 해당하는 문구 하나만 뜬다.
+         *
+         * 예전에는 두 제품군 모두 '이 앱' 하나로 물었다. 그러면 세탁 조건 참가자에게
+         * **"이 앱을 다운로드할 의향이 있습니까"** 가 나간다 — 이염 방지 세탁 시트는
+         * 앱이 아니고 다운로드하는 물건도 아니라 응답이 성립하지 않는다. 게다가 21은
+         * 게임 쪽 동사(다운로드), 22·23은 비게임 쪽 동사(사용)를 써서 **한 척도 안에
+         * 두 제품군 문구가 섞여** 있었다.
+         *
+         * stem 대신 stemBy 를 쓴다. validate() 가 두 갈래를 다 갖췄는지 검사하고,
+         * 러너는 SURVEY.stemFor(item, stim) 으로 꺼내 쓴다. */
+        { id: '이용의도1', sub: '이용의도', type: 'likert',
+          stemBy: { game: '나는 이 게임을 다운로드할 의향이 있다',
+                    nongame: '나는 이 제품을 구매할 의향이 있다' } },
+        { id: '이용의도2', sub: '이용의도', type: 'likert',
+          stemBy: { game: '나는 이 게임을 플레이해 볼 의향이 있다',
+                    nongame: '나는 이 제품을 사용해 볼 의향이 있다' } },
+        { id: '이용의도3', sub: '이용의도', type: 'likert',
+          stemBy: { game: '이 광고를 보고 나니 이 게임을 한번 플레이해 보고 싶다',
+                    nongame: '이 광고를 보고 나니 이 제품을 한번 사용해 보고 싶다' } }
       ]
     },
     {
@@ -287,7 +316,7 @@
          * 자극 넷 중 둘에서 '인물'을 가리킬 대상이 없다. 그러면 실패를 봤어도 아니라고 답하게 되어
          * 조작점검이 광고 형식이 아니라 등장인물 유무를 재게 된다. 사전 문항의 '게임 속 인물' →
          * '광고 속 인물' 수정과 같은 이유다(위 PRE_INSTRUCTION 주석 참고). */
-        { id: '조작점검_실패2', sub: '조작점검_실패', type: 'likert', stem: '광고에는 원하던 결과를 얻지 못하는 장면이 있었다' },
+        { id: '조작점검_실패2', sub: '조작점검_실패', type: 'likert', stem: '광고에는 인물이 원하던 결과를 얻지 못하는 장면이 있었다' },
         { id: '조작점검_실패3', sub: '조작점검_실패', type: 'likert', stem: '광고에서 문제 상황이 분명히 드러났다' },
         { id: '조작점검_개입1', sub: '조작점검_개입', type: 'likert', stem: '이 광고에서 나는 직접 손을 대 잘못된 부분을 고칠 수 있었다' },
         { id: '조작점검_개입2', sub: '조작점검_개입', type: 'likert', stem: '이 광고는 내가 개입해서 결과를 바꿀 수 있게 되어 있었다' },
@@ -369,9 +398,7 @@
       { h: '부탁 말씀',
         p: ['아직 참여하지 않으신 분에게 오늘 보신 내용이나 이 설명을 말씀하지 말아 주세요. ' +
             '미리 알고 참여하시면 그분의 자료는 쓸 수 없게 됩니다.'] },
-      { h: '문의할 곳',
-        p: ['연구책임자 ' + CONTACT.pi + ' (' + CONTACT.affil + ') · ' + CONTACT.phone + ' · ' + CONTACT.email,
-            '연구 참여자로서의 권리에 대한 문의: ' + CONTACT.irb] }
+      { h: '문의할 곳', p: CONTACT_LINES }
     ]
   };
 
@@ -387,7 +414,7 @@
   var WITHDRAW_VALUE = 2;
   var WITHDRAW_ACK = '알겠습니다. 오늘 응답하신 자료는 분석에 사용하지 않습니다.';
 
-  var CLOSING = '모든 설문이 끝났습니다. 참여해 주셔서 감사합니다.';
+  var CLOSING = '모든 설문이 끝났습니다. 잠시 후 연구원이 연구에 대한 자세한 설명을 드리겠습니다.';
 
   /* ==========================================================
    * 7. 파생값 (러너가 사용)
@@ -426,6 +453,15 @@
     return item.reverse ? (item.scale + 1 - v) : v;
   }
 
+  /* 제품군에 따라 갈리는 문항의 문구를 꺼낸다.
+   * stim 은 러너가 쓰는 자극 이름('game' 이면 게임, 그 밖에는 비게임)이다.
+   * 갈리지 않는 문항은 stem 을 그대로 돌려주므로 렌더러는 구분 없이 이것만 부르면 된다. */
+  function stemFor(item, stim) {
+    if (item.stem) return item.stem;
+    if (!item.stemBy) return '';
+    return item.stemBy[stim === 'game' ? 'game' : 'nongame'] || '';
+  }
+
   function itemById(id) {
     for (var i = 0; i < BLOCK_ITEMS.length; i++) if (BLOCK_ITEMS[i].id === id) return BLOCK_ITEMS[i];
     return null;
@@ -462,7 +498,8 @@
       } else if (it.type === 'choice') {
         if (!it.options || !it.options.length) errs.push('choice 문항에 선택지가 없다: ' + it.id);
       } else if (it.type === 'likert') {
-        if (!it.stem) errs.push('문두 없음: ' + it.id);
+        /* 제품군에 따라 갈리는 문항은 stem 대신 stemBy 를 갖는다 */
+        if (!it.stem && !it.stemBy) errs.push('문두 없음: ' + it.id);
         if (!(it.scale >= 2)) errs.push('척도점수 오류: ' + it.id);
       } else {
         errs.push('알 수 없는 type: ' + it.id + ' (' + it.type + ')');
@@ -487,16 +524,23 @@
     var total = PRE.length + BLOCK_ITEMS.length * 4 + ATTENTION_BLOCKS.length + DEMO.length;
     if (total !== 123) errs.push('총 문항 수가 123이 아니다: ' + total);
 
-    if (NONGAME_CATEGORY.indexOf('[') === 0) {
-      errs.push('경고: 비게임 앱 카테고리가 아직 확정되지 않았다 — ' + NONGAME_CATEGORY);
-    }
-
     /* 동의서·디브리핑 자기점검.
      * 연락처가 대괄호인 채로 참가자 앞에 나가면 문의할 곳이 없는 동의서가 된다. */
     var blanks = Object.keys(CONTACT).filter(function (k) { return CONTACT[k].indexOf('[') === 0; });
     if (blanks.length) {
       errs.push('경고: 동의서·디브리핑 연락처가 아직 비어 있다 — ' + blanks.join(', '));
     }
+    /* 제품군에 따라 갈리는 문항은 두 갈래를 다 갖춰야 한다.
+     * 한쪽만 있으면 그 조건 참가자 화면에 빈 문항이 뜬다.
+     * 갈래를 쓰는 문항만 본다 — 의미분별 문항은 문두 없이 양극 라벨만 쓴다. */
+    BLOCK_ITEMS.forEach(function (it) {
+      if (!it.stemBy) return;
+      if (it.stem) errs.push('stem 과 stemBy 를 함께 두면 갈래가 무시된다: ' + it.id);
+      if (!it.stemBy.game || !it.stemBy.nongame) {
+        errs.push('제품군별 문구가 온전하지 않다: ' + it.id);
+      }
+    });
+
     if (!CONSENT.checks.length) errs.push('동의서에 동의 항목이 없다');
     CONSENT.checks.forEach(function (c) {
       if (!c.id || !c.label) errs.push('동의 항목에 id 나 문구가 없다');
@@ -528,7 +572,7 @@
     ATTENTION: ATTENTION, ATTENTION_BLOCKS: ATTENTION_BLOCKS,
     DEMO: DEMO, DEMO_INSTRUCTION: DEMO_INSTRUCTION, CLOSING: CLOSING,
     DEFAULT_SCALE: DEFAULT_SCALE, LIKERT_TICKS: LIKERT_TICKS,
-    NONGAME_CATEGORY: NONGAME_CATEGORY,
+    stemFor: stemFor,
     recode: recode, subscaleMean: subscaleMean, itemById: itemById, validate: validate
   };
 

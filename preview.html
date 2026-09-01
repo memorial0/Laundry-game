@@ -453,7 +453,9 @@ function optButtons(item, scope, value) {
   return '<div class="opts">' + out + '</div>';
 }
 
-function renderItem(item, no, scope, value) {
+/* stim — 광고된 제품군('game' 이면 게임, 그 밖에는 비게임). 섹션 E 세 문항은
+ * 여기에 따라 대상 명사가 바뀐다(survey.js 의 stemBy). 나머지 문항은 영향이 없다. */
+function renderItem(item, no, scope, value, stim) {
   var body;
   if (item.type === 'sd') {
     // 양극 라벨은 문항마다 다르므로 눈금 바로 아래에 붙인다
@@ -479,16 +481,17 @@ function renderItem(item, no, scope, value) {
     }
   }
 
-  var stem = item.stem
-    ? '<div class="stem"><span class="n">' + no + '</span><span>' + esc(item.stem) + '</span></div>'
+  var text = S.stemFor(item, stim);
+  var stem = text
+    ? '<div class="stem"><span class="n">' + no + '</span><span>' + esc(text) + '</span></div>'
     : '<div class="stem"><span class="n">' + no + '</span></div>';
 
   return '<div class="item" data-item="' + item.id + '">' + stem + body + '</div>';
 }
 
-function renderItems(items, scope, store, startNo) {
+function renderItems(items, scope, store, startNo, stim) {
   return items.map(function (it, i) {
-    return renderItem(it, startNo + i, scope, store[it.id]);
+    return renderItem(it, startNo + i, scope, store[it.id], stim);
   }).join('');
 }
 
@@ -937,7 +940,7 @@ function showSurvey(s) {
     (pg.instruction ? '<p class="dim">' + pg.instruction + '</p>' : '') +
     '<p class="dim required">' + esc(S.REQUIRED_NOTE) + '</p>' +
     legendFor(items) +
-    renderItems(items, scope, store, startNo) +
+    renderItems(items, scope, store, startNo, b.stim) +
     '</div>';
 
   // 섹션 문자(A~F)는 연구원이 쪽을 짚을 때만 쓴다 — 참가자에게는 뜻이 없다
