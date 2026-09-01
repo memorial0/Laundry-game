@@ -65,7 +65,7 @@ module.exports = async function () {
     '모든 문장에 소리가 붙어 있다');
 
   /* ---- 장면 길이 안에 들어간다 ---- */
-  const DUR = { 1: 2.94, 2: 1.58, 3: 1.16, 4: 2.08, 7: 2.44, 8: 1.29, 9: 1.63, 10: 3.07 };  // 5·6 은 가변
+  const DUR = { 1: 2.94, 2: 1.58, 3: 4.0, 4: 2.08, 7: 2.44, 8: 1.29, 9: 4.0, 10: 8.0 };  // 5·6 은 가변
   const over = have.filter(k => {
     const no = Number(k.replace(/^s(\d+).*$/, '$1'));
     return DUR[no] !== undefined && table.sec[k] > DUR[no];
@@ -83,9 +83,14 @@ module.exports = async function () {
    * A·B 가 갈리는 장면(1·4)은 긴 쪽에 맞춰져 있으므로(SPEC 7장의 길이 동일 요건)
    * 짧은 쪽은 그 차이만큼 여유가 더 있다 — 0.06초다. 그래서 위 여유를 본다. */
   const TAIL = 0.3, SLACK = 0.1;
+  /* 말이 아니라 그림이 일하는 장면은 이 검사에서 뺀다 — 남는 시간이 빈 시간이 아니라
+   * 그 장면이 하는 일이다(scenes.js 의 DUR 표 주석). 3 불안 쌓기 · 9 전후 비교 ·
+   * 10 누를지 정하는 시간. 예외를 여기 적어 두면 표를 고칠 때 같이 눈에 들어온다. */
+  const VISUAL_SCENES = [3, 9, 10];
   const gap = k => DUR[Number(k.replace(/^s(\d+).*$/, '$1'))] - table.sec[k];
   const loose = have.filter(k => {
     const no = Number(k.replace(/^s(\d+).*$/, '$1'));
+    if (VISUAL_SCENES.indexOf(no) >= 0) return false;
     return DUR[no] !== undefined && gap(k) > TAIL + SLACK;
   });
   t.ok(loose.length === 0, `말 끝나고 ${TAIL}초 안에 컷 (빈 시간이 남지 않는다)`,
