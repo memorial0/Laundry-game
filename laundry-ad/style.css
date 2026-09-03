@@ -827,6 +827,39 @@ html[data-state="ended"] #scene-layer { pointer-events: none; }
 /* 고개 젓기(s4-head-deny)는 걷어냈다 — 장면 4 가 클로즈업이 되면서 얼굴이 프레임
  * 밖으로 나갔다. 그 자리의 감정은 이제 옷이 처지는 것(s4-garment-check)이 맡는다. */
 
+/* 8. 장면 8(개선 결과) — 장면 4 와 짝을 이루는 움직임.
+ *
+ * 장면 8 은 장면 4 와 **같은 클로즈업**이다(holdCloseup, 얼룩만 없다). 그런데
+ * 장면 4 에만 카메라와 옷 움직임이 걸려 있고 장면 8 은 통째로 정지 화면이었다.
+ * 길이가 1.29초일 때는 하드 컷 두 장 사이의 한 프레임처럼 지나가 티가 안 났는데,
+ * 노출 시간을 게임과 맞추며 3.25초가 되자 2.26초가 얼어붙은 그림이 된다 —
+ * 예전에 걷어낸 빈 시간이 그대로 돌아온다(scenes.js 의 DUR 표 주석).
+ *
+ * 방향은 장면 4 의 **반대**다. 장면 4 는 다가가면서 옷이 처지고(확인 → 낙담),
+ * 장면 8 은 물러나면서 옷이 올라온다(확인 → 안도). 같은 구도에서 같은 크기의
+ * 움직임을 반대로 걸어 두 장면이 짝으로 읽히게 한다.
+ *
+ * 값은 장면 4 보다 작다(카메라 1.045배 · 옷 22px). 여기는 실패가 아니라 해소라
+ * 크게 움직이면 제품 효과를 과장하는 연출이 된다(SPEC 2장). */
+@keyframes cam-settle8 {
+  0%   { transform: translate(-18px, -32px) scale(1.045); animation-timing-function: cubic-bezier(.22, 0, .2, 1); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+.sc8 .cam { animation: cam-settle8 var(--scene-dur, 3.25s) both; }
+
+@keyframes s8-garment-lift {
+  0%, 12% { translate: 0 10px; rotate: -.3deg; }
+  46%     { translate: 0 -22px; rotate: .35deg; }   /* 눈높이로 올려 색을 확인한다 */
+  100%    { translate: 0 -14px; rotate: .15deg; }
+}
+/* 장면 4 와 같은 이유로 transform 이 아니라 translate/rotate 개별 속성을 쓴다 —
+ * .hold-garment 안쪽에 이미 속성 transform 이 걸려 있어 덮어쓰면 옷이 원점으로 튄다. */
+.sc8 .cam .hold-garment {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;            /* 손에 잡힌 윗변 */
+  animation: s8-garment-lift var(--scene-dur, 3.25s) cubic-bezier(.3, 0, .25, 1) both;
+}
+
 /* 10. 장면 10 — 카메라가 물러나는 동안 팩샷만 움직이고 글자는 그냥 거기 있었다.
  *
  * 이름 → 밑줄 → 부제 → 면책 순으로 자리를 잡는다. 카메라가 멈추는 3.5초 안에

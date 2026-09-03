@@ -65,36 +65,45 @@ module.exports = async function () {
     '모든 문장에 소리가 붙어 있다');
 
   /* ---- 장면 길이 안에 들어간다 ---- */
-  const DUR = { 1: 2.94, 2: 1.58, 3: 4.0, 4: 2.08, 7: 2.44, 8: 1.29, 9: 4.0, 10: 8.0 };  // 5·6 은 가변
-  const over = have.filter(k => {
-    const no = Number(k.replace(/^s(\d+).*$/, '$1'));
-    return DUR[no] !== undefined && table.sec[k] > DUR[no];
-  });
-  t.ok(over.length === 0, '클립이 장면보다 길지 않다 (말이 끊기지 않는다)',
-    over.map(k => `${k} ${table.sec[k]}s`));
+  /* DUR 을 여기 옮겨 적지 않고 실행 중인 엔진에서 읽는다 — 옮겨 적으면 scenes.js 를
+   * 고칠 때 이 표만 옛 값으로 남아, 어긋난 것을 검사가 통과시킨다. */
+  const DUR = {};
+  for (const sc of w0.AD_ENGINE.list) if (sc.dur) DUR[sc.no] = sc.dur;   // 5·6 은 가변이라 dur 이 없다
+  const sceneNo = k => Number(k.replace(/^s(\d+).*$/, '$1'));
 
-  /* ---- 말이 끝나면 바로 넘어간다 ----
-   *
-   * 예전에는 위의 "길지 않다"만 봤다. 그래서 0.86초 말하고 6초짜리 장면에 서 있어도
-   * 통과했고, 실제로 장면 3 이 그랬다(빈 시간 5.14초). 이제 장면 길이가 클립에
-   * 붙어 있는지까지 본다 — scenes.js 의 DUR 표는 손으로 적은 값이라, 클립을 다시
-   * 구워 길이가 달라지면 여기서 어긋난다.
+  /* 하한은 클립 + 0.3초다. 클립 끝에 무음이 0.1초쯤 들어 있어 말이 실제로 끝나고
+   * 컷까지 0.4초 안팎이 남는다 — 이보다 좁으면 말꼬리가 컷에 잘린다.
    *
    * A·B 가 갈리는 장면(1·4)은 긴 쪽에 맞춰져 있으므로(SPEC 7장의 길이 동일 요건)
-   * 짧은 쪽은 그 차이만큼 여유가 더 있다 — 0.06초다. 그래서 위 여유를 본다. */
-  const TAIL = 0.3, SLACK = 0.1;
-  /* 말이 아니라 그림이 일하는 장면은 이 검사에서 뺀다 — 남는 시간이 빈 시간이 아니라
-   * 그 장면이 하는 일이다(scenes.js 의 DUR 표 주석). 3 불안 쌓기 · 9 전후 비교 ·
-   * 10 누를지 정하는 시간. 예외를 여기 적어 두면 표를 고칠 때 같이 눈에 들어온다. */
-  const VISUAL_SCENES = [3, 9, 10];
-  const gap = k => DUR[Number(k.replace(/^s(\d+).*$/, '$1'))] - table.sec[k];
-  const loose = have.filter(k => {
-    const no = Number(k.replace(/^s(\d+).*$/, '$1'));
-    if (VISUAL_SCENES.indexOf(no) >= 0) return false;
-    return DUR[no] !== undefined && gap(k) > TAIL + SLACK;
-  });
-  t.ok(loose.length === 0, `말 끝나고 ${TAIL}초 안에 컷 (빈 시간이 남지 않는다)`,
-    loose.map(k => `${k} +${gap(k).toFixed(2)}s`));
+   * 짧은 쪽은 그 차이만큼 여유가 더 있다 — 0.06초다. */
+  const TAIL = 0.3;
+  const tight = have.filter(k => DUR[sceneNo(k)] !== undefined &&
+    table.sec[k] + TAIL > DUR[sceneNo(k)] + 0.001);
+  t.ok(tight.length === 0, `클립 + ${TAIL}초가 장면 안에 들어간다 (말꼬리가 안 잘린다)`,
+    tight.map(k => `${k} ${table.sec[k]}s > ${DUR[sceneNo(k)]}s − ${TAIL}s`));
+
+  /* ---- 장면 길이를 정하는 것은 나래이션이 아니다 ----
+   *
+   * 한때는 장면 길이가 **클립 + 0.3초** 였다. 말이 끝나면 컷이라는 규칙이었고,
+   * 이 자리에서 "말 끝나고 0.3초 안에 컷" 인지를 검사했다. 그 규칙은 게임 자극과의
+   * 노출 시간 대칭을 깨뜨렸고(watch 18.6 vs 31.2초), 노출 시간은 자극과 1:1로
+   * 공선이라 로그로 통제할 수 없어 되돌렸다(INTEGRATION §5-14).
+   *
+   * 그래서 지금 길이를 정하는 것은 **자극 간 대칭**이고 나래이션은 위의 하한일 뿐이다.
+   * 검사도 그 자리로 옮긴다 — 클립을 다시 굽든 DUR 을 손보든, 합계가 움직이면
+   * 두 자극의 노출 시간이 어긋난 것이므로 여기서 걸려야 한다.
+   * 상대편 값은 game/test/smoke.cjs 가 찍는다(watch 28.0s · intervene 49.6s). */
+  const WATCH_SUM = 28.0;   // 장면 1·2·3·4·10
+  const FIXED_SUM = 39.15;  // 장면 5·6 을 뺀 전부
+  const sum = nos => nos.reduce((a, n) => a + DUR[n], 0);
+  t.ok(Math.abs(sum([1, 2, 3, 4, 10]) - WATCH_SUM) < 0.005,
+    `watch 고정 길이 ${WATCH_SUM}s (게임 자극과 맞춘 값)`, sum([1, 2, 3, 4, 10]).toFixed(2) + 's');
+  t.ok(Math.abs(sum([1, 2, 3, 4, 7, 8, 9, 10]) - FIXED_SUM) < 0.005,
+    `intervene 고정분 ${FIXED_SUM}s (게임 자극과 맞춘 값)`, sum([1, 2, 3, 4, 7, 8, 9, 10]).toFixed(2) + 's');
+
+  /* 장면 10 만은 연출이 아니라 측정 때문에 8초다 — 게임 제품 카드와 같아야 한다.
+   * CTA_CLICK 이 종속변인이라 여기가 어긋나면 클릭률 차이에 "누를 시간"이 섞인다. */
+  t.ok(DUR[10] === 8.0, '장면 10(제품 메시지) = 8초 — 게임 제품 카드와 같다', DUR[10]);
 
   /* ---- 장면마다 말투가 다르다 ---- */
   /* 처음 구웠을 때는 열세 문장이 전부 같은 톤·같은 속도였다(F0 가 227~259Hz 한
