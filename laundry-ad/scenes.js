@@ -341,8 +341,12 @@
       '<rect x="966" y="840" width="18" height="34" fill="' + PAL.base + '" opacity=".7"/>' +
       ART.box(806, 686, 1) +
       '</g>';
+    /* 바구니를 오른쪽·아래로 옮겼다. 예전 자리(x22)는 프레임 왼쪽 끝에 걸쳐 있어
+     * 재생 프레이밍(장면 2 는 1.3배로 밀어 art x145 부터 보인다)에서 거의 잘렸다.
+     * 그때는 그 자리를 인물이 채우고 있어 티가 안 났는데, 인물을 걷어내자 화면
+     * 왼쪽 아래가 통째로 빈 바닥이 됐다. 바구니가 그 자리를 맡는다. */
     var basket = o.noProps ? '' :
-      '<g class="basket">' +
+      '<g class="basket" transform="translate(150,96)">' +
       '<path d="M34,1206 h196 l-21,172 q-4,26 -30,26 h-94 q-26,0 -30,-26 Z" fill="' + PAL.brandPale + '" stroke="' + PAL.boxEdge + '" stroke-width="6" stroke-linejoin="round"/>' +
       '<rect x="22" y="1186" width="220" height="28" rx="14" fill="' + PAL.box + '" stroke="' + PAL.boxEdge + '" stroke-width="6"/>' +
       '<path d="M74,1236 v138 M132,1236 v140 M190,1236 v138" stroke="' + PAL.boxEdge + '" stroke-width="5" opacity=".8"/>' +
@@ -599,77 +603,34 @@
     return ART.garment(V.dark.shape, o);
   };
 
-  /* 인물 — 발 밑선 기준. arms 마크업은 장면이 넘긴다 */
-  ART.person = function (o) {
-    o = o || {};
-    var x = o.x === undefined ? 330 : o.x;
-    var y = o.y === undefined ? 1400 : o.y;
-    var mood = o.mood || 'neutral';
-    var mouth = mood === 'happy'
-      ? '<path d="M-28,-600 q28,32 56,0" fill="none" stroke="' + PAL.ink + '" stroke-width="7" stroke-linecap="round"/>'
-      : mood === 'worried'
-        ? '<path d="M-26,-586 q26,-22 52,0" fill="none" stroke="' + PAL.ink + '" stroke-width="7" stroke-linecap="round"/>'
-        : '<path d="M-24,-592 h48" fill="none" stroke="' + PAL.ink + '" stroke-width="7" stroke-linecap="round"/>';
-    var brow = mood === 'worried'
-      ? '<path d="M-48,-670 l36,14 M48,-670 l-36,14" fill="none" stroke="' + PAL.hair + '" stroke-width="8" stroke-linecap="round"/>'
-      : '<path d="M-44,-666 h30 M44,-666 h-30" fill="none" stroke="' + PAL.hair + '" stroke-width="8" stroke-linecap="round" opacity=".8"/>';
-    var blush = mood === 'happy'
-      ? '<ellipse cx="-46" cy="-612" rx="15" ry="9" fill="#E8836B" opacity=".28"/>' +
-        '<ellipse cx="46" cy="-612" rx="15" ry="9" fill="#E8836B" opacity=".28"/>'
-      : '';
-
-    return '<g class="person ' + (o.cls || '') + '" transform="translate(' + x + ',' + y + ')">' +
-      '<ellipse cx="0" cy="-6" rx="132" ry="24" fill="' + PAL.ink + '" opacity=".13"/>' +
-      // 다리 · 신발
-      '<rect x="-80" y="-268" width="66" height="248" rx="28" fill="' + PAL.wearLo + '"/>' +
-      '<rect x="14" y="-268" width="66" height="248" rx="28" fill="' + PAL.wearLo + '"/>' +
-      '<path d="M-88,-20 h82 q10,0 10,10 v10 q0,10 -12,10 h-70 q-12,0 -12,-14 Z" fill="' + PAL.ink + '" opacity=".78"/>' +
-      '<path d="M6,-20 h82 q12,0 12,14 v6 q0,10 -12,10 h-70 q-12,0 -12,-10 v-10 q0,-10 10,-10 Z" fill="' + PAL.ink + '" opacity=".78"/>' +
-      // 상의
-      '<rect x="-96" y="-548" width="192" height="308" rx="54" fill="' + PAL.wear + '"/>' +
-      '<path d="M-96,-420 q96,34 192,0 v146 q0,34 -34,34 h-124 q-34,0 -34,-34 Z" fill="' + PAL.wearLo + '" opacity=".45"/>' +
-      '<path d="M-40,-548 q40,44 80,0" fill="none" stroke="' + PAL.wearLo + '" stroke-width="8"/>' +
-      /* 목 · 머리 — 따로 묶는다. 머리만 돌려야 "무엇을 보고 있는지"가 생긴다.
-       * 그림은 그대로고 <g> 하나만 더 생기므로 조건·버전 모두 같은 마크업이다. */
-      '<g class="head">' +
-      '<rect x="-24" y="-588" width="48" height="48" rx="10" fill="' + PAL.skin + '"/>' +
-      '<path d="M-24,-568 q24,22 48,0 v-20 h-48 Z" fill="' + PAL.skinEdge + '" opacity=".55"/>' +
-      '<circle cx="0" cy="-642" r="70" fill="' + PAL.skin + '" stroke="' + PAL.skinEdge + '" stroke-width="4"/>' +
-      '<ellipse cx="-70" cy="-636" rx="12" ry="16" fill="' + PAL.skin + '" stroke="' + PAL.skinEdge + '" stroke-width="4"/>' +
-      '<ellipse cx="70" cy="-636" rx="12" ry="16" fill="' + PAL.skin + '" stroke="' + PAL.skinEdge + '" stroke-width="4"/>' +
-      '<path d="M-72,-648 a72,72 0 0 1 144,0 q-16,-16 -40,-14 q-30,4 -58,-10 q-16,-8 -26,10 q-12,4 -20,14 Z" fill="' + PAL.hair + '"/>' +
-      '<path d="M-72,-648 q-6,26 2,44 q-24,-14 -18,-40 Z" fill="' + PAL.hair + '"/>' +
-      '<path d="M72,-648 q6,26 -2,44 q24,-14 18,-40 Z" fill="' + PAL.hair + '"/>' +
-      '<circle cx="-25" cy="-638" r="8" fill="' + PAL.ink + '"/>' +
-      '<circle cx="25" cy="-638" r="8" fill="' + PAL.ink + '"/>' +
-      '<circle cx="-22" cy="-641" r="3" fill="#fff"/>' +
-      '<circle cx="28" cy="-641" r="3" fill="#fff"/>' +
-      blush + brow + mouth +
-      '</g>' +
-      // 팔도 따로 묶는다 — 던지는 동작의 뒤따름을 팔에만 줄 수 있어야 한다
-      '<g class="arms">' + (o.arms || '') + '</g>' +
-      '</g>';
-  };
-
-  /* 손 (인물) — 소매 끝 + 손바닥 */
+  /* 손 — 소매 끝동 + 손등 + 손가락. 옷의 어깨를 위에서 쥔 손이다.
+   *
+   * 예전에는 **반지름 26 짜리 원 하나에 미소 곡선**이었다. 이 도형이 자극 전체를
+   * 아동 도서 삽화로 읽히게 만든 가장 큰 요인이었다 — 손가락 없는 동그란 손은
+   * 그림책 문법이고, 배경을 성인 톤으로 갈고 나니 이것만 남아 튀었다.
+   *
+   * 전신 인물을 걷어냈으므로(아래 s2 주석) **화면에 사람이 나오는 자리는 이제
+   * 손뿐이다.** 이 도형 하나가 광고의 나이를 정한다.
+   *
+   * 손가락은 테두리(굵은 skinEdge) 위에 살(가는 skin)을 얹어 그린다 — 한 겹으로
+   * 그리면 네 손가락이 한 덩어리로 뭉쳐 다시 벙어리장갑이 된다. */
   ART.personHand = function (cx, cy) {
+    var FINGERS = 'M-18,4 q-4,17 2,25 M-6,8 q-4,19 2,27 M6,8 q-3,19 3,26 M17,4 q-2,16 4,22';
+    var THUMB = 'M-26,-4 q-13,7 -11,19 q2,11 13,9';
     return '<g transform="translate(' + cx + ',' + cy + ')">' +
-      '<circle cx="0" cy="0" r="26" fill="' + PAL.skin + '" stroke="' + PAL.skinEdge + '" stroke-width="4"/>' +
-      '<path d="M-14,-18 q14,-10 28,0" fill="none" stroke="' + PAL.skinEdge + '" stroke-width="4" opacity=".7"/>' +
+      // 소매 끝동
+      '<path d="M-31,-48 h62 q9,0 9,11 v17 q0,9 -10,9 h-60 q-10,0 -10,-9 v-17 q0,-11 9,-11 Z"' +
+      ' fill="' + PAL.wear + '" stroke="' + PAL.wearLo + '" stroke-width="3" stroke-linejoin="round"/>' +
+      // 손등
+      '<path d="M-27,-16 q0,-13 13,-13 h28 q13,0 13,13 v17 q0,15 -14,19 l-26,6 q-14,3 -14,-13 Z"' +
+      ' fill="' + PAL.skin + '" stroke="' + PAL.skinEdge + '" stroke-width="3" stroke-linejoin="round"/>' +
+      // 엄지 · 손가락 넷 — 천 앞으로 내려와 접힌다
+      '<path d="' + THUMB + '" fill="none" stroke="' + PAL.skinEdge + '" stroke-width="15" stroke-linecap="round"/>' +
+      '<path d="' + THUMB + '" fill="none" stroke="' + PAL.skin + '" stroke-width="12" stroke-linecap="round"/>' +
+      '<path d="' + FINGERS + '" fill="none" stroke="' + PAL.skinEdge + '" stroke-width="14" stroke-linecap="round"/>' +
+      '<path d="' + FINGERS + '" fill="none" stroke="' + PAL.skin + '" stroke-width="11" stroke-linecap="round"/>' +
       '</g>';
   };
-
-  ART.armsHold =
-    '<path d="M-96,-500 q-54,72 -46,144" fill="none" stroke="' + PAL.wear + '" stroke-width="48" stroke-linecap="round"/>' +
-    '<path d="M96,-500 q54,72 46,144" fill="none" stroke="' + PAL.wear + '" stroke-width="48" stroke-linecap="round"/>' +
-    '<path d="M-148,-390 q10,-14 22,-8 M148,-390 q-10,-14 -22,-8" fill="none" stroke="' + PAL.wearLo + '" stroke-width="10" stroke-linecap="round"/>' +
-    ART.personHand(-142, -356) + ART.personHand(142, -356);
-
-  // 옷을 가슴 앞으로 들어 올린 자세 (표정이 가려지지 않도록 손 위치를 낮춘다)
-  ART.armsLift =
-    '<path d="M-100,-476 q-46,-24 -14,-76" fill="none" stroke="' + PAL.wear + '" stroke-width="48" stroke-linecap="round"/>' +
-    '<path d="M100,-476 q46,-24 14,-76" fill="none" stroke="' + PAL.wear + '" stroke-width="48" stroke-linecap="round"/>' +
-    ART.personHand(-114, -552) + ART.personHand(114, -552);
 
   /* 세탁기 창 클로즈업 (장면 3·7 공용) */
   ART.drum = function (inner, o) {
@@ -766,16 +727,52 @@
   };
 
 
-  // 2. 제품 미사용 — 상자는 선반 위에 그대로(사용하지 않음)
+  /* 2. 제품 미사용 — 상자는 선반 위에 그대로(사용하지 않음)
+   *
+   * 왜 전신 인물을 걷어냈나
+   *   예전에는 방 왼쪽에 인물이 서서 빨래를 세탁기로 던졌다. 그 인물이 점 눈 ·
+   *   손가락 없는 원 손 · 콩 몸통 · 4.5등신의 **아동 도서 삽화**였고, 배경을 성인
+   *   광고 톤으로 갈고 나자 화면에서 그것만 남아 튀었다.
+   *
+   *   벡터로 어른을 사실적으로 그리는 쪽은 어설퍼질 위험이 커서, 이 범주의 실사
+   *   광고가 실제로 하는 방식을 골랐다 — **얼굴과 몸은 프레임 밖에 두고 손·옷·기계만
+   *   남긴다.** 장면 4·8 은 이미 같은 이유로 클로즈업이었다(holdCloseup 주석).
+   *
+   *   덤이 둘. 게임 자극(잠수정 — 사람이 없다)과의 비대칭이 하나 줄었고, 인물
+   *   마크업(person·armsHold·armsLift·holdFigure·holdFrame)이 통째로 사라져 코드가
+   *   줄었다. 그 다섯은 여기가 마지막 사용처였다.
+   *
+   * 조건 간 비대칭은 없다 — 장면 2 는 watch·intervene 이 함께 보는 장면이다.
+   *
+   * 팔은 화면 위에서 들어온다. 옷을 쥔 손이 투입구 쪽으로 내려갔다가 놓고 물러난다
+   * (s2-hands). 옷이 날아 들어가는 것은 예전 그대로 s2-toss 다 — 두 그룹이 따로
+   * 움직여야 "놓았다"가 된다. 한 그룹에 묶으면 손도 드럼 안으로 빨려 들어간다. */
   ART.s2 = function (o) {
     o = o || {};
+    /* 팔뚝은 **짧고 굵어야** 팔로 보인다. 처음에는 손을 옷마다 하나씩(y 1045·1140)
+     * 두고 폭 86·74 로 그렸는데, 프레임 위에서 거기까지 내려오는 600px 짜리 가는
+     * 막대 둘이 되어 팔이 아니라 촉수였다. 손을 위로 올려 팔을 짧게 하고(340px)
+     * 폭을 130 으로 키웠다 — 길이:폭이 2.6:1 이면 팔뚝으로 읽힌다.
+     *
+     * 손은 밝은 옷의 **어깨**를 잡는다. 옷 상자의 원점(x,y)에 두면 옷 왼쪽 위
+     * 허공을 쥔다. 어깨 자리는 소재마다 다르므로 GARMENT_BODY 를 쓴다 —
+     * 클로즈업(holdCloseup)이 쓰는 것과 같은 표다. ver B(수건)도 저절로 맞는다.
+     *
+     * 짙은 옷은 밝은 옷 위에 얹는다. 손 셋이 필요 없고, "둘을 같이 빤다"는 이
+     * 광고의 전제가 한 뭉치로 보인다. */
+    var S = 2.6, gx = 140, gy = 700;
+    var m = ART.GARMENT_BODY[V.light.shape] || ART.GARMENT_BODY.shirt;
+    var a1 = ART.armFromTop(gx + m.gx1 * S, gy + m.gy * S, -1, 96, 1.3);
+    var a2 = ART.armFromTop(gx + m.gx2 * S, gy + m.gy * S, 1, 96, 1.3);
     return ART.room() +
       ART.washer(o.still ? { open: true } : { both: true }) +
-      ART.person({ arms: ART.armsHold }) +
+      // 팔은 옷 뒤 · 손은 옷 앞. 같은 클래스라 두 그룹이 같이 움직인다
+      '<g class="' + anim('s2-hands', o.still) + '">' + a1.arm + a2.arm + '</g>' +
       '<g class="' + anim('s2-toss', o.still) + '">' +
-      ART.lightGarment({ x: 382, y: 1032, s: 0.92 }) +
-      ART.darkGarment({ x: 300, y: 1120, s: 0.6 }) +
-      '</g>';
+      ART.lightGarment({ x: gx, y: gy, s: S }) +
+      ART.darkGarment({ x: gx + 130, y: gy + 330, s: 1.1 }) +
+      '</g>' +
+      '<g class="' + anim('s2-hands', o.still) + '">' + a1.hand + a2.hand + '</g>';
   };
 
   // 3. 실패 진행 — 짙은 색에서 염료가 번진다
@@ -802,13 +799,6 @@
   ART.s4 = function (o) {
     o = o || {};
     return ART.holdCloseup({ stained: true, still: o.still });
-  };
-
-  // 4·8·9 공용 — 제품 사용 여부(stained)만 다르다. 인물·의류·구도는 같은 코드
-  ART.holdFigure = function (o) {
-    o = o || {};
-    return ART.person({ mood: o.mood || 'neutral', arms: ART.armsLift }) +
-      ART.lightGarment({ x: 220, y: 840, s: 1.1, stained: !!o.stained, cls: 'hold-garment' });
   };
 
   /* 옷을 들어 올려 살펴보는 클로즈업 (장면 4·8·9 공용)
@@ -874,12 +864,6 @@
       hand(hx1) + hand(hx2) +
       '</g>';
   };
-
-  ART.holdFrame = function (o) {
-    o = o || {};
-    return ART.room() + ART.washer({ open: true }) + ART.holdFigure(o);
-  };
-
   // 5. 되감기 — 장면 4→3→2 역방향 후 세탁 시작 직전에 정지
   ART.s5 = function (o) {
     o = o || {};

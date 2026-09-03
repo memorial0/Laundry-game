@@ -248,40 +248,26 @@ html, body {
  * 장면 1 이 클로즈업이 되면서 인물이 프레임 밖으로 나갔다. 두 옷이 흔들리는
  * 연출(s1-sway-l · s1-sway-d)이 남아 화면이 정지로 안 읽히게 한다. */
 
-/* 장면 2 인물 — 던지는 뒤따름.
+/* 장면 2 의 손 — 넣고 놓고 물러난다.
  *
- * s2-toss 는 1.4초 뒤에 시작해 옷만 세탁기로 날려 보냈다. 정작 던진 사람은
- * 미동도 없었다. 팔을 세탁기 쪽으로 올렸다 내리고 몸통이 따라 기울게 한다.
- * 5초 기준 28% 가 1.4초 — 옷이 출발하는 순간에 맞춘다.
+ * 예전에는 전신 인물이 서서 빨래를 던졌고(fig-toss-arms · fig-toss-body) 그 인물이
+ * 아동 도서 삽화였다. 인물을 걷어내고 화면 위에서 들어오는 팔과 손만 남겼다
+ * (scenes.js 의 ART.s2 주석). 두 규칙 다 그때 같이 걷어냈다.
  *
- * 팔은 회전이 아니라 이동으로 든다. 양팔을 한 덩어리로 회전시키면 한쪽은 올라가고
- * 반대쪽은 내려가서 두 손으로 넣는 동작이 안 된다. */
-@keyframes fig-toss-arms {
+ * 손과 옷은 **다른 그룹이고 다른 애니메이션**이다. 한 그룹으로 묶으면 손도 옷을
+ * 따라 드럼 안으로 빨려 들어간다. 지금은 손이 투입구 쪽으로 내려갔다가(42%)
+ * 옷을 놓고 위로 빠진다 — s2-toss 가 28% 에 시작하므로 그 직후다.
+ *
+ * 마지막에 프레임 밖까지 올리는 이유: 손이 화면에 남아 있으면 문이 닫히는 것을
+ * 보는 눈이 손으로 간다. 이 장면의 일은 "아무것도 넣지 않고 문이 닫힌다"이다. */
+@keyframes s2-hands {
   0%,
-  26%  { translate: 0 0; rotate: 0deg; }
-  33%  { translate: -3px 4px; rotate: 1.5deg; }    /* 살짝 뒤로 모았다가 */
-  44%  { translate: 11px -23px; rotate: -5deg; }   /* 투입구 쪽으로 */
-  62%  { translate: 4px -7px; rotate: -1.5deg; }
-  100% { translate: 0 0; rotate: 0deg; }
+  24%  { transform: translate(0px, 0px); }
+  42%  { transform: translate(120px, 34px); }     /* 투입구 쪽으로 */
+  56%  { transform: translate(96px, -70px); }     /* 놓고 */
+  100% { transform: translate(40px, -520px); }    /* 프레임 밖으로 */
 }
-@keyframes fig-toss-body {
-  0%,
-  26%  { translate: 0 0; rotate: 0deg; }
-  33%  { translate: -2px 0; rotate: -1.2deg; }
-  46%  { translate: 5px 0; rotate: 3.4deg; }
-  70%  { translate: 1px 0; rotate: .8deg; }
-  100% { translate: 0 0; rotate: 0deg; }
-}
-.sc2 .cam .person .arms {
-  transform-box: fill-box;
-  transform-origin: 50% 0%;            /* 어깨 */
-  animation: fig-toss-arms var(--scene-dur, 5s) cubic-bezier(.3, 0, .35, 1) both;
-}
-.sc2 .cam .person {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-  animation: fig-toss-body var(--scene-dur, 5s) cubic-bezier(.3, 0, .35, 1) both;
-}
+.s2-hands { animation: s2-hands var(--scene-dur, 5s) cubic-bezier(.3, 0, .35, 1) both; }
 
 /* 장면 4 의 인물 규칙(어깨 처짐 fig-sag · 고개 젓기 s4-head-deny)은 걷어냈다 —
  * 장면 4 가 클로즈업이 되면서 인물이 프레임 밖으로 나갔다. 그 자리의 감정은 옷이
