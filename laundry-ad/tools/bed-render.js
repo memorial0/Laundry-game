@@ -49,6 +49,10 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
+
+/* 표본율. 낮추면 빨라지지만 쓰지 않는다 — 잡음 층의 에너지가 좁은 대역에 몰려
+ * 저역통과를 지나는 양이 달라져서 절대값이 1dB 가까이 움직인다(재 봤다).
+ * 표 캐시(waveTable)를 넣어 두어 48kHz 로도 두 배경음이 3초면 끝난다. */
 const SR = 48000;
 
 /* 코어(SFX-CORE)가 정하는 값. 두 자극 공통이라 여기 한 번만 적는다 —
@@ -57,6 +61,11 @@ const BED = { gain: 0.075, fadeIn: 1.2, fadeOut: 0.9 };
 const MASTER = 0.32;
 const SEQ_START = 0.12;      // 모든 악절이 함께 출발하는 시각 (코어의 t0 = t + 0.12)
 const NOTE_ATTACK = 0.008;   // seqNote 의 상승 시간
+
+/* 재는 구간 — 페이드 인(1.2초)이 끝나고 악절이 한 바퀴를 돈 뒤부터 끝의 페이드 앞까지.
+ * 한 바퀴(9.6초)만 보면 세탁 쪽 편차가 커서 두 배경음의 차이가 0.8dB 까지 흔들린다.
+ * 두 바퀴를 보면 0.1dB 안으로 안정된다 — 검사도 이 구간을 쓴다. */
+const FROM_SEC = 9.72;
 
 /* 참가자가 실제로 듣는 길이. watch 를 기준으로 잰다 — 두 자극이 같은 값이고(INTEGRATION §4),
  * 배경음 한 바퀴가 9.6초라 2.9바퀴가 들어간다. */
@@ -102,32 +111,56 @@ function assertCore(file) {
  * 2. 합성 — 코어의 buildBed() · seqNote() 를 그대로 옮긴 것
  * ========================================================================== */
 
-/** 대역제한 파형 한 표본. Web Audio 의 PeriodicWave 와 같은 배음 구성이다. */
-function waveSample(type, phase, f) {
-  const nyq = SR / 2;
-  const kmax = Math.max(1, Math.floor(nyq / f));
-  let v = 0, k;
-  switch (type) {
-    case 'sine':
-      return Math.sin(phase);
-    case 'square':
-      for (k = 1; k <= kmax; k += 2) v += Math.sin(k * phase) / k;
-      return v * (4 / Math.PI);
-    case 'sawtooth':
-      for (k = 1; k <= kmax; k++) v += (k % 2 ? 1 : -1) * Math.sin(k * phase) / k;
-      return v * (2 / Math.PI);
-    case 'triangle':
-      for (k = 1; k <= kmax; k += 2) {
-        v += (((k - 1) / 2) % 2 ? -1 : 1) * Math.sin(k * phase) / (k * k);
-      }
-      return v * (8 / (Math.PI * Math.PI));
-    default:
-      return Math.sin(phase);
+/* 대역제한 파형 — Web Audio 의 PeriodicWave 와 같은 배음 구성이다.
+ *
+ * 표본마다 배음을 다시 더하면 느리다(square 220Hz 는 한 표본에 109항). 주파수마다 한
+ * 주기를 표에 구워 두고 위상으로 찾아 쓴다. 표 길이 8192 는 가장 낮은 음(110Hz,
+ * 배음 218개)에서도 최고 배음 한 주기에 37점이 들어가는 크기다. */
+const WAVE_TABLE_N = 8192;
+const waveCache = new Map();
+
+function waveTable(type, f) {
+  const key = type + '@' + f;
+  const hit = waveCache.get(key);
+  if (hit) return hit;
+  const kmax = Math.max(1, Math.floor((SR / 2) / f));
+  const t = new Float64Array(WAVE_TABLE_N);
+  for (let i = 0; i < WAVE_TABLE_N; i++) {
+    const ph = 2 * Math.PI * i / WAVE_TABLE_N;
+    let v = 0, k;
+    switch (type) {
+      case 'sine': v = Math.sin(ph); break;
+      case 'square':
+        for (k = 1; k <= kmax; k += 2) v += Math.sin(k * ph) / k;
+        v *= 4 / Math.PI; break;
+      case 'sawtooth':
+        for (k = 1; k <= kmax; k++) v += (k % 2 ? 1 : -1) * Math.sin(k * ph) / k;
+        v *= 2 / Math.PI; break;
+      case 'triangle':
+        for (k = 1; k <= kmax; k += 2) v += (((k - 1) / 2) % 2 ? -1 : 1) * Math.sin(k * ph) / (k * k);
+        v *= 8 / (Math.PI * Math.PI); break;
+      default: v = Math.sin(ph);
+    }
+    t[i] = v;
   }
+  waveCache.set(key, t);
+  return t;
+}
+
+/** 위상(라디안)으로 표를 찾아 선형보간한다. */
+function waveSample(type, phase, f) {
+  const t = waveTable(type, f);
+  const x = (phase / (2 * Math.PI)) * WAVE_TABLE_N;
+  const i = Math.floor(x), u = x - i;
+  const a = t[((i % WAVE_TABLE_N) + WAVE_TABLE_N) % WAVE_TABLE_N];
+  const b = t[((i + 1) % WAVE_TABLE_N + WAVE_TABLE_N) % WAVE_TABLE_N];
+  return a + (b - a) * u;
 }
 
 /** 코어의 noiseBuffer() 와 같은 잡음 1.2초. Math.random 을 쓰지 않는다. */
+let noiseCache = null;
 function noiseBuffer() {
+  if (noiseCache) return noiseCache;
   const n = Math.floor(SR * 1.2);
   const d = new Float64Array(n);
   let seed = 22695477;
@@ -135,6 +168,7 @@ function noiseBuffer() {
     seed = (seed * 1103515245 + 12345) & 0x7fffffff;
     d[i] = (seed / 0x3fffffff) - 1;
   }
+  noiseCache = d;
   return d;
 }
 
@@ -157,7 +191,13 @@ function biquad(type, f0, q) {
  * 배경음 한 편을 렌더한다.
  * @returns {{pcm: Float64Array, layers: Array}} pcm 은 마스터를 통과한 뒤의 신호
  */
-function render(voice, seconds) {
+/** 자극별 파일이 넘기는 레벨 맞춤 계수(createSfx 의 bedLevel). 없으면 1 이다. */
+function readBedLevel(file) {
+  const m = /bedLevel:\s*([0-9.]+)/.exec(fs.readFileSync(file, 'utf8'));
+  return m ? parseFloat(m[1]) : 1;
+}
+
+function render(voice, seconds, bedLevel) {
   const n = Math.round(seconds * SR);
   const mix = new Float64Array(n);       // BED.gain·MASTER 를 걸기 **전**의 합
   const layers = [];
@@ -231,7 +271,8 @@ function render(voice, seconds) {
   const pcm = new Float64Array(n);
   for (let s = 0; s < n; s++) {
     const t = s / SR;
-    let env = t < BED.fadeIn ? 0.0001 * Math.pow(BED.gain / 0.0001, t / BED.fadeIn) : BED.gain;
+    const ceil = BED.gain * (bedLevel === undefined ? 1 : bedLevel);
+    let env = t < BED.fadeIn ? 0.0001 * Math.pow(ceil / 0.0001, t / BED.fadeIn) : ceil;
     const tail = seconds - t;
     if (tail < BED.fadeOut) env *= Math.pow(0.0001 / 1, 1 - tail / BED.fadeOut);
     pcm[s] = mix[s] * env * MASTER;
@@ -334,7 +375,10 @@ function measure(pcm, fromSec, toSec) {
     midPct: 100 * mid / tot,
     highPct: 100 * high / tot,
     audibleDb: 10 * Math.log10(mid + high),   // 작은 스피커에서 남는 대역의 세기
-    dynDb: 20 * Math.log10(pct(0.9) / Math.max(1e-12, pct(0.1)))
+    dynDb: 20 * Math.log10(pct(0.9) / Math.max(1e-12, pct(0.1))),
+    /* 100ms 창 세기의 90분위 — 큐(0.1~0.3초)와 견주기에 맞는 시간 규모다.
+     * 최대치로 견주면 마림바 어택 한 점이 대표값이 되어 실제보다 훨씬 나쁘게 읽힌다. */
+    st90Db: 20 * Math.log10(pct(0.9))
   };
 }
 
@@ -378,16 +422,14 @@ function main() {
   assertCore(LAUNDRY); assertCore(GAME);
 
   const beds = {
-    세탁: readArray(LAUNDRY, 'BED_VOICE'),
-    게임: readArray(GAME, 'BED_VOICE')
+    세탁: { voice: readArray(LAUNDRY, 'BED_VOICE'), level: readBedLevel(LAUNDRY) },
+    게임: { voice: readArray(GAME, 'BED_VOICE'), level: readBedLevel(GAME) }
   };
 
   const out = {};
   for (const name of Object.keys(beds)) {
-    const r = render(beds[name], WATCH_SEC);
-    /* 페이드 인이 끝나고(1.2초) 악절이 한 바퀴를 돈 뒤부터 잰다 — 9.72~28.0초.
-     * 시작 구간을 넣으면 페이드가 두 자극의 차이로 잘못 읽힌다. */
-    out[name] = { r, m: measure(r.pcm, 9.72, WATCH_SEC - BED.fadeOut) };
+    const r = render(beds[name].voice, WATCH_SEC, beds[name].level);
+    out[name] = { r, m: measure(r.pcm, FROM_SEC, WATCH_SEC - BED.fadeOut) };
     if (wantWav) {
       const dir = path.join(ROOT, 'laundry-ad', 'test', 'out', 'bed');
       fs.mkdirSync(dir, { recursive: true });
@@ -404,7 +446,8 @@ function main() {
     console.log('  ' + label.padEnd(26) + f(a).padStart(10) + f(b).padStart(10) + String(cmp).padStart(12));
   };
 
-  console.log('\n배경음 실측 — watch 길이 ' + WATCH_SEC + '초 · 9.72초부터 잰다 (페이드·첫 바퀴 제외)\n');
+  console.log('\n배경음 실측 — watch 길이 ' + WATCH_SEC + '초 · ' + FROM_SEC + '초부터 잰다 (페이드·첫 바퀴 제외)');
+  console.log('레벨 맞춤 계수(bedLevel): 세탁 ' + beds['세탁'].level + ' · 게임 ' + beds['게임'].level + '\n');
   console.log('  ' + ''.padEnd(26) + '세탁'.padStart(9) + '게임'.padStart(9) + '차'.padStart(11));
   console.log('  ' + '-'.repeat(58));
   row('라우드니스 (LUFS)', L.lufs, G.lufs, v => v.toFixed(1));
@@ -444,4 +487,9 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { render, measure, readArray, WATCH_SEC, SR };
+/* 검사(test/sfx.test.js)가 같은 설정으로 다시 잴 수 있게 구간까지 내보낸다 —
+ * 여기 값과 검사 값이 갈리면 "도구로는 맞는데 검사는 틀리다"가 된다. */
+module.exports = {
+  render, measure, readArray, readBedLevel,
+  WATCH_SEC, FROM_SEC, TO_SEC: WATCH_SEC - BED.fadeOut, MASTER, LAUNDRY, GAME
+};
