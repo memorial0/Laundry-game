@@ -276,6 +276,14 @@
       '<radialGradient id="g-pack" cx="0.5" cy="0.42" r="0.7">' +
       '<stop offset="0" stop-color="' + PAL.brandPale + '"/><stop offset="1" stop-color="#E7EEF4"/>' +
       '</radialGradient>' +
+      /* 팩샷 뒤의 빛. 예전에는 불투명도 0.55 짜리 **원** 하나라 가장자리가 그대로
+       * 보였고, 제품 뒤에 흰 접시를 세워 둔 것처럼 읽혔다. 가장자리를 0 으로
+       * 흘려 빛으로 만든다. */
+      '<radialGradient id="g-glow" cx="0.5" cy="0.5" r="0.5">' +
+      '<stop offset="0" stop-color="#fff" stop-opacity="0.72"/>' +
+      '<stop offset="0.55" stop-color="#fff" stop-opacity="0.42"/>' +
+      '<stop offset="1" stop-color="#fff" stop-opacity="0"/>' +
+      '</radialGradient>' +
       /* 제품명 위를 한 번 스치는 빛(장면 10). 게임 자극의 제품 카드에도 같은 연출이
        * 같은 값으로 들어가 있다 — 한쪽 제품명만 반짝이면 그 차이가 제품 평가로 들어간다. */
       '<linearGradient id="g-sheen" x1="0" y1="0" x2="1" y2="0">' +
@@ -405,16 +413,53 @@
   };
 
   /* 시트 상자 (배경 소품 · 팩샷 공용) */
-  ART.box = function (x, y, s) {
+  /* 제품 상자.
+   *
+   * 예전에는 **두께 없는 둥근 사각형**이었다. 선반 위 소품일 때는 티가 안 났지만
+   * 장면 10 은 팩샷이다 — 8초 동안 제품만 보는 화면인데 종이에 그린 도형이 서
+   * 있었다. 세제 광고의 팩샷에서 제품은 물건으로 보여야 한다.
+   *
+   * 윗면·옆면을 붙여 상자로 만든다. **소실점을 쓰지 않고 평행(등각)으로 민다** —
+   * 원근을 주면 선반 위(작게)와 팩샷(크게)에서 각도가 달라 보인다. 같은 물건이
+   * 두 장면에서 다르게 생기면 안 된다.
+   *
+   * 그리는 순서는 옆면 · 윗면 · 앞면이다. 앞면을 마지막에 덮어야 옆면·윗면의
+   * 테두리가 앞면 안쪽으로 새지 않는다.
+   *
+   * `full` 은 팩샷용이다 — 선반 위에서는 안 읽히는 크기라 자리만 잡는 막대 둘을
+   * 두고, 팩샷에서는 실제 문구를 넣는다. 상자 자체는 같은 물건이다.
+   *
+   * 로컬 좌표: 앞면 좌상단이 원점, 앞면 180x130, 깊이 34(위로 24). */
+  ART.box = function (x, y, s, full) {
     s = s === undefined ? 1 : s;
+    var d = 34, h = 24;
     return '<g transform="translate(' + x + ',' + y + ') scale(' + s + ')">' +
-      '<rect x="0" y="0" width="180" height="130" rx="12" fill="' + PAL.box + '" stroke="' + PAL.boxEdge + '" stroke-width="5"/>' +
+      /* 세 면의 밝기 순서가 입체를 만든다: 윗면 > 앞면 > 옆면.
+       * 처음에는 윗면에 brandPale(#CFE3DD)을 썼는데 앞면(#E7EFEC)보다 **어두워서**
+       * 순서가 뒤집혔고, 빛이 아래에서 오는 꼴이라 상자가 납작해 보였다. */
+      // 옆면 (가장 어둡다)
+      '<path d="M180,0 L' + (180 + d) + ',' + (-h) + ' V' + (130 - h) + ' L180,130 Z"' +
+      ' fill="#AFCAC1" stroke="' + PAL.boxEdge + '" stroke-width="4" stroke-linejoin="round"/>' +
+      // 윗면 (가장 밝다)
+      '<path d="M0,0 L' + d + ',' + (-h) + ' H' + (180 + d) + ' L180,0 Z"' +
+      ' fill="#F5FAF8" stroke="' + PAL.boxEdge + '" stroke-width="4" stroke-linejoin="round"/>' +
+      // 앞면
+      '<rect x="0" y="0" width="180" height="130" rx="5" fill="' + PAL.box + '" stroke="' + PAL.boxEdge + '" stroke-width="5"/>' +
+      '<rect x="0" y="0" width="180" height="42" rx="5" fill="' + PAL.brandPale + '"/>' +
       '<path d="M0,42 h180 v18 H0 Z" fill="' + PAL.brand + '" opacity=".9"/>' +
-      '<rect x="0" y="0" width="180" height="42" rx="12" fill="' + PAL.brandPale + '"/>' +
       ART.text(90, 30, 24, BRAND, { fill: PAL.brandLo, weight: 800 }) +
-      '<rect x="34" y="76" width="112" height="9" rx="4.5" fill="' + PAL.boxEdge + '"/>' +
-      '<rect x="52" y="94" width="76" height="9" rx="4.5" fill="' + PAL.boxEdge + '" opacity=".7"/>' +
-      '<path d="M148,104 q14,-10 22,0 t-6,14" fill="none" stroke="' + PAL.brand + '" stroke-width="5" stroke-linecap="round" opacity=".8"/>' +
+      (full
+        ? ART.text(90, 84, 19, '이염 방지', { fill: PAL.ink, opacity: '.85' }) +
+          ART.text(90, 108, 19, '세탁 시트', { fill: PAL.ink, opacity: '.85' })
+        : '<rect x="34" y="76" width="112" height="9" rx="4.5" fill="' + PAL.boxEdge + '"/>' +
+          '<rect x="52" y="94" width="76" height="9" rx="4.5" fill="' + PAL.boxEdge + '" opacity=".7"/>') +
+      /* 물결 마크는 앞면 오른쪽 아래에 있는데, 팩샷에서는 바로 그 자리에 시트가
+       * 비스듬히 선다. 반쯤 덮인 마크는 장식이 아니라 **얼룩**으로 보인다 —
+       * 얼룩이 이 광고의 실패 신호라 제품 상자에 그런 것이 있으면 안 된다.
+       * 팩샷에서는 앞에 선 시트가 같은 물결을 이미 갖고 있다. */
+      (full ? '' :
+        '<path d="M148,104 q14,-10 22,0 t-6,14" fill="none" stroke="' + PAL.brand +
+        '" stroke-width="5" stroke-linecap="round" opacity=".8"/>') +
       '</g>';
   };
 
@@ -1108,22 +1153,30 @@
   // 10. 제품 메시지 + CTA
   ART.s10 = function (o) {
     o = o || {};
+    /* 팩샷의 크기.
+     *
+     * 예전 상자는 앞면 432x336(화면 폭의 40%)이었고 두께가 없었다. 8초 동안 제품을
+     * 보는 화면인데 제품이 화면의 한 귀퉁이만 차지하고 있었다는 뜻이다.
+     * 앞면을 522x377(화면 폭의 48%)로 키우고 상자로 만들었다(ART.box).
+     *
+     * **위아래로 넘볼 수 있는 자리는 정해져 있다.** 아래는 제품명(y1214)이 한계고
+     * 그 아래로 밑줄(1252)·부제(1320)·CTA(1401~1555)·면책(1600)이 줄지어 있다.
+     * 위는 비어 있어(후광 원뿐) 그쪽으로 키웠다 — 상자 윗면이 y430, 앞면이 500 이다.
+     *
+     * **CTA 는 한 값도 안 건드린다.** 버튼의 크기·자리·색·등장 연출은 게임 자극의
+     * 제품 카드와 짝이고 `CTA_CLICK` 이 이 연구의 종속변인이다(INTEGRATION §5-13·15).
+     * 배경(g-pack)도 팔레트 교체 때 못 박아 둔 값 그대로다. */
     return '<rect x="0" y="0" width="1080" height="1920" fill="url(#g-pack)"/>' +
-      '<circle cx="540" cy="700" r="330" fill="#fff" opacity=".55"/>' +
-      '<ellipse cx="540" cy="900" rx="300" ry="42" fill="' + PAL.ink + '" opacity=".12" filter="url(#f-soft)"/>' +
+      '<circle cx="540" cy="700" r="420" fill="url(#g-glow)"/>' +
+      // 그림자는 상자 앞면 아래끝(y877)과 시트 아래끝(y~985) 사이에 둔다 — 둘이
+      // 같은 바닥에 놓인 것으로 보여야 한다. 위로 더 붙이면 상자가 떠 보인다
+      '<ellipse cx="540" cy="962" rx="292" ry="30" fill="' + PAL.ink + '" opacity=".2" filter="url(#f-soft)"/>' +
       '<g class="' + anim('s10-pack', o.still) + '">' +
-      '<g transform="translate(540,740)">' +
-      ART.sheet(170, 90, 0.95) +
-      '<g transform="translate(-216,-230) scale(2.4)">' +
-      '<rect x="0" y="0" width="180" height="140" rx="12" fill="' + PAL.box + '" stroke="' + PAL.boxEdge + '" stroke-width="5"/>' +
-      '<rect x="0" y="0" width="180" height="46" rx="12" fill="' + PAL.brandPale + '"/>' +
-      '<path d="M0,46 h180 v16 H0 Z" fill="' + PAL.brand + '"/>' +
-      ART.text(90, 32, 24, BRAND, { fill: PAL.brandLo, weight: 800 }) +
-      ART.text(90, 88, 19, '이염 방지', { fill: PAL.ink, opacity: '.85' }) +
-      ART.text(90, 112, 19, '세탁 시트', { fill: PAL.ink, opacity: '.85' }) +
-      '<path d="M126,120 q14,-12 26,0 t-6,16" fill="none" stroke="' + PAL.brand + '" stroke-width="5" stroke-linecap="round"/>' +
-      '</g>' +
-      '</g>' +
+      ART.box(279, 500, 2.9, true) +
+      /* 시트 한 장을 상자 앞에 비스듬히 세운다 — 상자만 있으면 "무엇이 들었는지"가
+       * 안 보인다. 상자 앞면 아래끝(y877)보다 아래로 내려와야 상자에 붙은 딱지가
+       * 아니라 앞에 선 물건으로 읽힌다. 기울기도 같은 이유다. */
+      '<g transform="rotate(-7 706 884)">' + ART.sheet(706, 884, 1.3) + '</g>' +
       '</g>' +
       '<g class="s10-name">' + ART.text(540, 1214, 76, BRAND, { weight: 800, fill: PAL.brandLo }) + '</g>' +
       /* 제품명을 빛이 한 번 스친다. 자르기(clip)는 바깥 그룹이 걸고 움직이는 것은 안쪽
