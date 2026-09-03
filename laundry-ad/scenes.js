@@ -1015,22 +1015,40 @@
   };
 
   /* 인물의 손 (watch 모드에서 시트를 집어 넣는 손 — 소매 + 손) */
+  /* 장면 6 의 손 (watch 모드 — 광고 속 인물이 시트를 대신 넣는 4초짜리 시연).
+   *
+   * 예전에는 **둥근 손바닥 덩어리에 뭉툭한 손가락 셋**이 삐져나온 모양이었다.
+   * 전신 인물을 걷어내며 `personHand` 를 다시 그릴 때 이 함수는 별개라 같이 안
+   * 고쳐졌고, 없앤 줄 알았던 그림책 문법이 여기만 그대로 남아 있었다. 화면
+   * 한가운데를 4초 동안 지나가는 손이다.
+   *
+   * 이제 `personHand` 를 그대로 쓴다 — 손이 두 종류면 같은 인물의 손이 장면마다
+   * 다르게 생긴다. 하나를 고치면 다른 하나가 남는 것도 이 때문이었다.
+   *
+   * 90도 돌려 손가락이 왼쪽(시트 쪽)을 향하게 한다. personHand 는 손가락이 +y,
+   * 소매가 -y 이므로 rotate(90) 이면 손가락 -x · 소매 +x 가 된다. 그 뒤로 팔뚝을
+   * 이어 붙여 화면 밖에서 들어온 팔로 만든다.
+   *
+   * 팔뚝 굵기(104)는 소매 끝동(62 x 1.9 = 118)보다 조금 가늘다 — 굵으면 끝동이
+   * 팔에 묻혀 손목이 사라진다.
+   *
+   * 손의 원점은 CSS 가 시트 중심 + (70,40) 에 둔다(s6-grip-watch). 그래서 손가락
+   * 끝이 시트의 오른쪽 절반에 얹힌다.
+   *
+   * 팔은 **오른쪽 아래로** 뻗어 나간다. 처음에는 오른쪽으로 곧게 뻗었는데, 손이
+   * 시트 시작 자리(HOME 300,1500)에 있을 때 팔 끝이 화면 한가운데(x681)에서 뚝
+   * 끊겼다 — 어깨 없이 허공에 뜬 토막이다. 길이를 늘려 가로로 빼면 이번에는 굵은
+   * 초록 막대가 화면 아래 3분의 1을 가로지른다.
+   *
+   * 대각선으로 빼면 둘 다 없다. 손이 HOME 에 있을 때는 아래 모서리로, 투입구
+   * (DROP 600,880)에 있을 때는 오른쪽 모서리로 나간다 — 어느 시점에도 팔이
+   * 화면 안에서 끝나지 않는다. */
   ART.handGrip = function () {
-    return '<g transform="rotate(-16) scale(1.2)">' +
-      // 소매(팔뚝 일부)
-      '<path d="M10,-10 L92,36 q24,14 10,38 q-16,24 -40,10 L4,44 Z"' +
-      ' fill="' + PAL.wear + '" stroke="' + PAL.wearLo + '" stroke-width="5" stroke-linejoin="round"/>' +
-      '<path d="M62,18 L46,52" stroke="' + PAL.wearLo + '" stroke-width="7" stroke-linecap="round" opacity=".55"/>' +
-      // 손가락 (손바닥 아래에 먼저)
-      '<path d="M-40,-26 q-34,-6 -44,14 M-40,0 q-38,-2 -46,20 M-36,24 q-32,6 -36,26" fill="none"' +
-      ' stroke="' + PAL.skin + '" stroke-width="26" stroke-linecap="round"/>' +
-      '<path d="M-40,-26 q-34,-6 -44,14 M-40,0 q-38,-2 -46,20 M-36,24 q-32,6 -36,26" fill="none"' +
-      ' stroke="' + PAL.skinEdge + '" stroke-width="4" stroke-linecap="round" opacity=".45"/>' +
-      // 손바닥
-      '<path d="M-46,-36 q52,-24 78,18 q18,30 -6,54 q-28,28 -64,8 q-36,-20 -34,-46 q2,-22 26,-34 Z"' +
-      ' fill="' + PAL.skin + '" stroke="' + PAL.skinEdge + '" stroke-width="5" stroke-linejoin="round"/>' +
-      // 엄지
-      '<path d="M-34,-30 q-22,-16 -38,-2 q-14,14 4,26" fill="' + PAL.skin + '" stroke="' + PAL.skinEdge + '" stroke-width="5" stroke-linejoin="round"/>' +
+    return '<g transform="rotate(-14)">' +
+      // 팔뚝 — 오른쪽 아래 화면 밖에서 들어온다
+      '<path d="M56,6 L360,580" fill="none" stroke="' + PAL.wear +
+      '" stroke-width="104" stroke-linecap="round"/>' +
+      '<g transform="rotate(90) scale(1.9)">' + ART.personHand(0, 0) + '</g>' +
       '</g>';
   };
 
