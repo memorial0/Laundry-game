@@ -129,7 +129,7 @@ html, body {
  * 괄호 안 옛 값은 fallback 이다 — ?still 캡처처럼 변수가 안 걸리는 경로에서
  * 예전 길이 그대로 돈다. 전환 연출(cut-*)과 등장 팝(s10-pack·s10-btn-in)은
  * 장면 길이와 무관한 고정 시간이라 그대로 둔다.
- * 무한 반복(s3-drift·s7-absorb·s6-ring…)도 마찬가지다.
+ * 무한 반복(drum-slosh·s7-absorb·s6-ring…)도 마찬가지다.
  */
 
 /* ---- 장면별 애니메이션 (②단계 플레이스홀더 모션) ----
@@ -358,14 +358,32 @@ html, body {
 @keyframes s3-tint { 0% { opacity: 0; } 100% { opacity: .75; } }
 .s3-tint { animation: s3-tint var(--scene-dur, 6s) cubic-bezier(.62, 0, .38, 1) both; }
 
-@keyframes s3-drift {
-  0%   { opacity: 0; transform: none; }
-  25%  { opacity: .9; }
-  100% { opacity: .35; transform: translate(var(--tx), var(--ty)); }
+/* 수면이 출렁인다.
+ *
+ * 드럼 안이 "물"로 보이려면 수면이 움직여야 한다 — 고인 채 가만히 있으면 색칠한
+ * 반원이다. 좌우 이동과 아주 작은 기울기를 겹쳐 한쪽으로 쏠렸다 돌아오게 한다.
+ *
+ * 물결 path 가 드럼보다 넓게(84~944 vs 198~882) 그려져 있어 ±40px 로 움직여도
+ * 가장자리에서 물이 끝나는 것이 안 보인다.
+ *
+ * 드럼 회전(s3-ramp, 6초에 한 번 감았다 멎음)과 **일부러 주기를 안 맞춘다.**
+ * 맞물리면 물이 드럼에 붙어 같이 도는 것처럼 보인다 — 물은 드럼과 따로 논다.
+ * 장면 3(6초)·장면 7(3.9초) 어느 쪽 길이와도 나누어떨어지지 않는 4.3초다. */
+@keyframes drum-slosh {
+  0%   { transform: translate(-24px, 0) rotate(-.5deg); }
+  50%  { transform: translate(26px, -5px) rotate(.55deg); }
+  100% { transform: translate(-24px, 0) rotate(-.5deg); }
 }
-/* 3.4초는 6초 장면에서 1.76주기라 마지막 한 바퀴가 하드 컷에 잘려 나갔다.
- * 3초면 정확히 두 바퀴가 끝나고 장면이 넘어간다. */
-.s3-drift { opacity: 0; animation: s3-drift 3s ease-out infinite; }
+.drum-slosh {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: drum-slosh 4.3s ease-in-out infinite;
+}
+
+/* s3-drift(장면 3 의 떠다니는 염료 입자)는 걷어냈다 — 물이 붉어지는 것으로 이미
+ * 말이 되고, 또렷한 원 열두 개가 물 위에 뜨면 그게 배양접시의 세포로 읽혔다.
+ * 입자는 장면 7 에만 남는다(s7-absorb — 시트가 염료를 붙잡는 그림이라 하나하나가
+ * 보여야 한다). part-static 은 그 장면의 ?still 캡처용 대역이라 남긴다. */
 .part-static { opacity: .7; }
 
 /* 5. 되감기 — 4 → 3 → 2 역방향, 세탁 시작 직전에 정지 */

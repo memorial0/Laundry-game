@@ -254,8 +254,11 @@
       '<stop offset="0" stop-color="' + PAL.body + '"/><stop offset="0.62" stop-color="' + PAL.body + '"/>' +
       '<stop offset="1" stop-color="' + PAL.bodyLo + '"/>' +
       '</linearGradient>' +
-      '<radialGradient id="g-water" cx="0.42" cy="0.36" r="0.78">' +
-      '<stop offset="0" stop-color="#EAF3F8"/><stop offset="1" stop-color="' + PAL.water + '"/>' +
+      /* 드럼 **안쪽**(수면 위)이다. 예전에는 옅은 물색(#EAF3F8)이라 창 전체가 밝았고,
+       * 그 위의 흰 옷이 안 떴다. 물은 이제 따로 그리므로(ART.drum 의 water) 여기는
+       * 물이 아니라 통 안이다 — 빛이 안 드는 금속이라 어둡다. */
+      '<radialGradient id="g-water" cx="0.42" cy="0.3" r="0.9">' +
+      '<stop offset="0" stop-color="#8DA0B0"/><stop offset="1" stop-color="#4B5966"/>' +
       '</radialGradient>' +
       '<radialGradient id="g-glass" cx="0.36" cy="0.3" r="0.8">' +
       '<stop offset="0" stop-color="#B9CBDD"/><stop offset="1" stop-color="' + PAL.glass + '"/>' +
@@ -300,6 +303,8 @@
       '<feGaussianBlur stdDeviation="7"/></filter>' +
       '<filter id="f-blob" x="-40%" y="-40%" width="180%" height="180%">' +
       '<feGaussianBlur stdDeviation="4"/></filter>' +
+      /* 물·거품을 드럼 창 안에 가둔다. 창 밖으로 새면 세탁기 몸통 위로 물이 흐른다. */
+      '<clipPath id="c-drum"><circle cx="540" cy="1000" r="342"/></clipPath>' +
       '</defs>';
   };
 
@@ -633,6 +638,33 @@
   };
 
   /* 세탁기 창 클로즈업 (장면 3·7 공용) */
+  /* 드럼 안의 물.
+   *
+   * 예전에는 드럼 원판을 옅은 파랑 그라디언트로 통째로 칠하고 그 위에 염료 원 두
+   * 개를 겹쳐 원판 전체를 물들였다. 그러면 화면이 물이 아니라 **색깔 있는 원판**이다 —
+   * 거기에 동그란 염료 입자가 떠 있으니 배양접시로 읽혔고, 6초짜리 장면(장면 3)이
+   * 그 그림으로 서 있었다.
+   *
+   * 드럼식 세탁기는 물이 **아래에 고여** 있고, 수면이 출렁이고, 유리에 거품이 붙는다.
+   * 셋 다 넣었다. 그리고 염료는 원판이 아니라 **물을** 물들인다 — "물이 붉어진다"가
+   * 이 장면이 할 말이고, 그래야 다음 컷(옷이 분홍이 된 것)의 원인이 화면에 있다.
+   *
+   * 수면 높이(1108)는 드럼 중심(1000)보다 아래다. 반쯤 채우면 옷이 잠겨 안 보이고,
+   * 너무 얕으면 옷이 물에 안 닿아 이염의 경로가 화면에서 끊긴다.
+   *
+   * 물결 path 는 드럼(198~882)보다 넓게(84~944) 그린다. 출렁이며 좌우로 움직일 때
+   * 폭이 모자라면 가장자리에서 물이 끝나는 것이 보인다. */
+  var DRUM_WATER_Y = 1108;
+  var DRUM_WAVE = 'M84,' + DRUM_WATER_Y + ' q86,-30 172,0 t172,0 t172,0 t172,0 t172,0 V1420 H84 Z';
+
+  /* 유리에 붙은 거품. 자리는 고정 표다 — 난수를 쓰면 참가자마다 다른 화면이 된다.
+   * 수면 근처에 몰리되 몇 개는 위쪽 유리에도 남겨 둔다(세탁 중에 튄 것). */
+  var SUDS = [
+    [332, 1042, 26], [408, 1086, 17], [286, 1104, 13], [636, 1058, 22],
+    [716, 1094, 15], [560, 1030, 12], [470, 1044, 9], [660, 1006, 10],
+    [372, 972, 8], [612, 1132, 12], [500, 1120, 9], [770, 1048, 11]
+  ];
+
   ART.drum = function (inner, o) {
     o = o || {};
     // 드럼 안쪽 타공
@@ -642,6 +674,38 @@
       holes += '<circle cx="' + (540 + Math.cos(rad) * 306).toFixed(1) + '" cy="' + (1000 + Math.sin(rad) * 306).toFixed(1) +
         '" r="9" fill="' + PAL.ringLo + '" opacity=".35"/>';
     }
+
+    var slosh = o.still ? '' : 'drum-slosh';
+    // 물 — 옷 뒤에 깔린다
+    var water =
+      '<g clip-path="url(#c-drum)"><g class="' + slosh + '">' +
+      '<path d="' + DRUM_WAVE + '" fill="' + PAL.water + '"/>' +
+      '<path d="' + DRUM_WAVE + '" fill="' + PAL.glass + '" opacity=".22" transform="translate(-46,30)"/>' +
+      '<path d="' + DRUM_WAVE + '" fill="none" stroke="#fff" stroke-width="6" opacity=".45"/>' +
+      '</g></g>';
+    /* 잠긴 부분을 덮는 얇은 물 — 옷 위에 깔려야 "물에 잠겼다"가 된다.
+     * 이게 없으면 옷이 물 앞에 떠 있는 그림이다. */
+    var glaze =
+      '<g clip-path="url(#c-drum)"><g class="' + slosh + '">' +
+      '<path d="' + DRUM_WAVE + '" fill="' + PAL.water + '" opacity=".42"/>' +
+      '</g></g>';
+    // 염료가 물에 푸는 것 (장면 3 만 — o.dyeClass 를 넘긴다)
+    var dye = !o.dyeClass && !o.dyeStill ? '' :
+      '<g clip-path="url(#c-drum)"><g class="' + (o.dyeClass || '') + '"' +
+      (o.dyeStill ? ' opacity=".75"' : '') + '>' +
+      '<path d="' + DRUM_WAVE + '" fill="' + PAL.dye + '" opacity=".5"/>' +
+      '<circle cx="430" cy="1090" r="150" fill="' + PAL.dye + '" opacity=".5" filter="url(#f-soft)"/>' +
+      '<circle cx="560" cy="1150" r="120" fill="' + PAL.dyeLo + '" opacity=".4" filter="url(#f-soft)"/>' +
+      '</g></g>';
+    var suds = '<g clip-path="url(#c-drum)">';
+    for (var s2 = 0; s2 < SUDS.length; s2++) {
+      var b = SUDS[s2];
+      suds += '<circle cx="' + b[0] + '" cy="' + b[1] + '" r="' + b[2] + '" fill="#fff" opacity=".30"/>' +
+        '<circle cx="' + (b[0] - b[2] * 0.3) + '" cy="' + (b[1] - b[2] * 0.34) + '" r="' + (b[2] * 0.34).toFixed(1) +
+        '" fill="#fff" opacity=".5"/>';
+    }
+    suds += '</g>';
+
     return ART.room({ noProps: true }) +
       '<g class="drum-body">' +
       '<rect x="56" y="300" width="968" height="1160" rx="56" fill="url(#g-body)" stroke="' + PAL.edge + '" stroke-width="8"/>' +
@@ -655,7 +719,9 @@
       '<circle cx="540" cy="1000" r="366" fill="' + PAL.bodyLo + '"/>' +
       '<circle cx="540" cy="1000" r="342" fill="' + (o.water || 'url(#g-water)') + '"/>' +
       holes +
+      water +
       inner +
+      glaze + dye + suds +
       '<circle cx="540" cy="1000" r="342" fill="none" stroke="' + PAL.ringLo + '" stroke-width="14" opacity=".45"/>' +
       '<path d="M290,832 q66,-102 186,-134" fill="none" stroke="#fff" stroke-width="34" stroke-linecap="round" opacity=".45"/>' +
       '<path d="M264,918 q14,-40 40,-72" fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round" opacity=".3"/>' +
@@ -677,8 +743,10 @@
       var tx, ty;
       if (o.toward) { tx = o.toward[0] - cx; ty = o.toward[1] - cy; }
       else { tx = PART_POS[i][0] * 0.55; ty = PART_POS[i][1] * 0.55; }
-      var r = 11 + (i % 4) * 4;
-      out += '<circle class="' + cls + '" cx="' + cx + '" cy="' + cy + '" r="' + r + '"' +
+      /* 가장자리를 흐린다. 또렷한 원이면 물에 푼 염료가 아니라 **떠 있는 알갱이**로
+       * 보이고, 열두 개가 모이면 배양접시의 세포가 된다. 반지름도 줄였다. */
+      var r = 8 + (i % 4) * 3;
+      out += '<circle class="' + cls + '" filter="url(#f-blob)" cx="' + cx + '" cy="' + cy + '" r="' + r + '"' +
         ' fill="' + (i % 3 === 0 ? PAL.dyeLo : PAL.dye) + '"' +
         ' style="--tx:' + tx.toFixed(0) + 'px;--ty:' + ty.toFixed(0) + 'px;animation-delay:' + (i * 0.16).toFixed(2) + 's"/>';
     }
@@ -784,14 +852,19 @@
       ART.lightGarment({ x: 500, y: 780, s: 1.0 }) +
       ART.darkGarment({ x: 330, y: 980, s: 0.95 }) +
       '</g>';
+    /* 염료는 이제 원판이 아니라 **물**을 물들인다(ART.drum 의 dye 층). 예전에는
+     * 드럼 원판 전체에 반투명 원을 얹어 창 전체가 균일하게 붉어졌는데, 그러면
+     * 물이 물드는 것이 아니라 조명 색이 바뀌는 것으로 보인다. */
+    /* 염료 입자(ART.particles)는 여기서 뺐다. 물이 붉어지는 것으로 이미 말이 되고,
+     * 또렷한 원 열두 개가 물 위에 떠 있으면 그게 다시 배양접시의 세포가 된다.
+     * 입자는 **장면 7 에만** 남는다 — 거기서는 "시트가 염료를 붙잡는다"는 뜻이라
+     * 하나하나가 눈에 보여야 하고, 실제로 시트 쪽으로 빨려 들어간다.
+     *
+     * 이 장면의 움직임은 셋으로 충분하다: 옷이 구르고(s3-tumble), 물이 출렁이고
+     * (drum-slosh), 물이 붉어진다(s3-tint). */
     return ART.drum(
-      tumble +
-      // 짙은 옷에서 배어 나오는 염료 구름
-      '<g class="' + anim('s3-tint', o.still) + '"' + (o.still ? ' opacity=".45"' : '') + '>' +
-      '<circle cx="540" cy="1000" r="342" fill="' + PAL.dye + '" opacity=".55"/>' +
-      '<circle cx="430" cy="1080" r="180" fill="' + PAL.dye + '" opacity=".45" filter="url(#f-soft)"/>' +
-      '</g>' +
-      ART.particles(anim('s3-drift', o.still) || 'part-static', {})
+      tumble,
+      { dyeClass: anim('s3-tint', o.still), dyeStill: !!o.still, still: o.still }
     );
   };
 
@@ -988,7 +1061,7 @@
       ART.text(112, 208, 26, 'i', { fill: '#fff', weight: 800 }) +
       ART.text(298, 210, 44, '기능 설명 화면', { fill: '#fff', weight: 700 }) +
       '</g>';
-    return ART.drum(inner, {}) + label;
+    return ART.drum(inner, { still: o.still }) + label;
   };
 
   // 8. 개선 결과 — 원래 색에 "가까운" 상태
