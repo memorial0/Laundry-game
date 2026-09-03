@@ -43,7 +43,9 @@ html, body {
   max-width: 100vw;
   max-height: 100dvh;
   overflow: hidden;
-  background: #eef1f5;
+  /* 첫 장면이 그려지기 전 한 프레임 보이는 바닥. 방 색(PAL.wall)과 맞춰 둔다 —
+     밝은 값으로 두면 어두워진 장면 1 앞에 흰 섬광이 한 번 친다. */
+  background: #AEB9C4;
   container-type: size;
 }
 
