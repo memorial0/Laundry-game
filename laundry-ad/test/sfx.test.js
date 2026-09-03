@@ -183,14 +183,39 @@ module.exports = async function () {
     '음량 천장·페이드는 코어가 정한다 (BED)');
   t.ok(!/\bBED\s*=\s*\{/.test((lb || '') + (gb || '')),
     '자극별 파일은 BED 를 덮어쓰지 않는다');
-  /* 배경음이 큐를 가리면 길이·세기를 맞춰 둔 의미가 없다.
-   * 가장 작은 큐(beat)보다 확실히 낮은지 본다. */
-  const bedGain = parseFloat((/gain:\s*([0-9.]+)/.exec(block(lc || '', 'BED')) || [])[1]);
+  /* ── 배경음의 크기는 세기표로 알 수 없다 ─────────────────────────────
+   *
+   * 여기서는 원래 `BED.gain < 가장 작은 큐 / 2` 하나만 봤다. 천장이 곧 크기라고
+   * 본 것인데 아니었다 — 지속음은 100% 울리고 악절은 감쇠하며 일부만 울려서, 같은
+   * 천장을 쓰고도 게임 배경음이 세탁보다 **9dB** 컸다(그때는 아무 검사도 안 걸렸다).
+   * 그래서 이제 실제 신호를 만들어(tools/bed-render.js) 잰 값으로 본다. 도구와 같은
+   * 설정·같은 구간을 쓴다 — 갈리면 "도구로는 맞는데 검사는 틀리다"가 된다.
+   *
+   * 약 3초 걸린다. 이 검사가 없으면 층 하나만 건드려도 조용히 다시 어긋난다. */
+  const BR = require('../tools/bed-render.js');
+  const beds = {};
+  for (const [name, file] of [['세탁', BR.LAUNDRY], ['게임', BR.GAME]]) {
+    const r = BR.render(BR.readArray(file, 'BED_VOICE'), BR.WATCH_SEC, BR.readBedLevel(file));
+    beds[name] = BR.measure(r.pcm, BR.FROM_SEC, BR.TO_SEC);
+  }
+  const dLufs = Math.abs(beds['세탁'].lufs - beds['게임'].lufs);
+  t.ok(dLufs <= 1.5, '두 배경음의 라우드니스가 같다 (1.5dB 안)',
+    { 세탁: beds['세탁'].lufs.toFixed(1) + ' LUFS', 게임: beds['게임'].lufs.toFixed(1) + ' LUFS',
+      차: dLufs.toFixed(2) + 'dB' });
+
+  /* 배경음이 큐를 가리면 길이·세기를 맞춰 둔 의미가 없다. 가장 작은 큐(beat)와
+   * 견준다 — 큐는 0.1~0.3초짜리라 배경음도 같은 시간 규모(100ms 창)로 본다.
+   * 최대치끼리 견주면 마림바 어택 한 점이 대표값이 되어 실제보다 나쁘게 읽힌다. */
   const cueGains = [...block(lc || '', 'CUES').matchAll(/gain:\s*([0-9.]+)/g)].map(m => parseFloat(m[1]));
   const minCue = cueGains.length ? Math.min.apply(null, cueGains) : NaN;
-  t.ok(bedGain > 0 && bedGain < minCue / 2,
-    '배경음이 가장 작은 큐보다 확실히 낮다 (큐를 가리지 않는다)',
-    { 배경음: bedGain, 최소큐: minCue });
+  const cueDb = 20 * Math.log10(minCue * BR.MASTER);
+  const HEADROOM = 15;   // dB. 실측은 22dB 안팎이라 여유가 있다 — 2배 실수를 잡는 자다
+  for (const name of ['세탁', '게임']) {
+    t.ok(cueDb - beds[name].st90Db >= HEADROOM,
+      name + ' 배경음이 가장 작은 큐보다 확실히 낮다 (큐를 가리지 않는다)',
+      { 배경음: beds[name].st90Db.toFixed(1) + 'dBFS', 최소큐: cueDb.toFixed(1) + 'dBFS',
+        여유: (cueDb - beds[name].st90Db).toFixed(1) + 'dB' });
+  }
   /* 음색은 달라야 한다 — 자극별 배경음을 쓰기로 한 결정이다(INTEGRATION.md §3). */
   t.ok(lb !== gb, '배경음 음색은 자극마다 다르다 (의도된 차이)');
 
@@ -221,8 +246,13 @@ module.exports = async function () {
    * 벌어져 있었고, 세탁에도 악절을 얹어 맞췄다. 거친 자라 2배까지는 봐준다 —
    * 실제 크기가 비슷한지는 사람이 같은 기기로 번갈아 들어야 안다. */
   const ratio = Math.round((Math.max(la, ga) / Math.min(la, ga)) * 100) / 100;
-  t.ok(ratio <= 2, '두 배경음의 밝기가 비슷하다 (한쪽만 앞에 나오지 않는다)',
-    { 배수: ratio, 세탁: la, 게임: ga });
+  /* 밝기는 세기표(audibleGain)가 아니라 잰 값으로 본다 — 세기표는 bedLevel 도
+   * 배음도 안 보므로 "세탁 0.68 > 게임 0.55" 처럼 실제와 반대로 읽힐 수 있다.
+   * 스펙트럼 중심으로 견준다(위에서 이미 렌더해 둔 값을 쓴다). */
+  const cRatio = beds['세탁'].centroidHz / beds['게임'].centroidHz;
+  t.ok(cRatio <= 2 && cRatio >= 0.5, '두 배경음의 밝기가 비슷하다 (한쪽만 앞에 나오지 않는다)',
+    { 배수: cRatio.toFixed(2),
+      세탁: Math.round(beds['세탁'].centroidHz) + 'Hz', 게임: Math.round(beds['게임'].centroidHz) + 'Hz' });
 
   t.section('오프라인 · 파일 없음');
   const external = /https?:\/\//;

@@ -47,6 +47,17 @@ const SFX = (function () {
    *
    * gain 은 가장 작은 큐(beat 0.16)보다 확실히 낮아야 한다 — 배경음이 큐를 가리면
    * 길이·세기를 글자 단위로 맞춰 둔 의미가 없어진다. */
+  /* 레벨 맞춤 계수 — **자극별 파일이 넘긴다**(createSfx 의 bedLevel).
+   *
+   * BED.gain 은 천장이지 크기가 아니다. 실제로 얼마나 크게 들리는지는 층의 구성이
+   * 정한다 — 지속음은 100% 울리고 악절은 감쇠하며 일부만 울리기 때문이다. 그래서
+   * 같은 천장을 쓰고도 게임 배경음이 세탁보다 9dB 컸다(K-가중 −49.0 vs −58.0 LUFS).
+   * 게임 에너지의 71%가 지속 사인 패드 두 층에서 나오는데 세탁에는 대응할 지속음이
+   * 없다 — 세탁 쪽은 고정 드론이 화음을 안 따라가는 문제 때문에 악절로 바꿨었다.
+   *
+   * 층 세기를 일곱 개씩 흩어 고치면 음색 문서와 어긋나므로, 레벨은 **파일마다 한 줄**로
+   * 두고 여기서 곱한다. 두 값 모두 laundry-ad/tools/bed-render.js 로 재서 정한 것이고,
+   * laundry-ad/test/sfx.test.js 가 두 배경음의 라우드니스 차이를 검사한다. */
   var BED = {
     gain: 0.075,     // 마스터 대비 배경음 천장 — 두 자극 공통.
                      // 천장은 가장 작은 큐(beat 0.16)의 절반, 즉 0.08 미만이어야 한다
@@ -72,13 +83,15 @@ const SFX = (function () {
    * @param {Object} VOICES  신호 이름 → 레이어 배열. 레이어는
    *   {wave,f0,f1,dur,gain,at} (오실레이터) 또는 {noise:true,f0,q,filter,dur,gain,at}.
    *   dur 은 CUES 의 길이를 넘지 못하고, gain 은 CUES 의 세기에 곱해진다.
-   * @param {{muted?: boolean, bed?: Array}} [options]
+   * @param {{muted?: boolean, bed?: Array, bedLevel?: number}} [options]
    *   bed 는 배경음 음색(BED_VOICE). 음량 천장·페이드는 코어의 BED 가 정한다.
+   *   bedLevel 은 그 천장에 곱하는 레벨 맞춤 계수다 — 위 BED 주석 참고.
    */
   function createSfx(VOICES, options) {
     var opt = options || {};
     var muted = !!opt.muted;
     var bedVoice = opt.bed || null;   // 배경음 음색 — 자극별 파일이 넘긴다
+    var bedLevel = opt.bedLevel === undefined ? 1 : opt.bedLevel;   // 레벨 맞춤 계수
     var ac = null;
     var master = null;
     var noiseCache = null;
@@ -183,7 +196,7 @@ const SFX = (function () {
       var out = ac.createGain();
       var t = ac.currentTime;
       out.gain.setValueAtTime(0.0001, t);
-      out.gain.exponentialRampToValueAtTime(BED.gain, t + BED.fadeIn);
+      out.gain.exponentialRampToValueAtTime(BED.gain * bedLevel, t + BED.fadeIn);
       out.connect(master);
 
       var srcs = [];
@@ -465,7 +478,7 @@ const SFX = (function () {
     /* 화음 진행은 Am → F → C → G 를 반복한다. 게임 음악에서 가장 흔한 진행이고,
      * 그래서 "게임 광고 음악"으로 바로 읽힌다 — 여기서 개성을 부릴 자리가 아니다.
      * 한 마디 2.4초(100bpm) · 네 마디 9.6초가 한 바퀴다. 세 층이 같은 길이로 돌아
-     * 어긋나지 않는다. 자극 길이(31.2초 · 55.4초)와는 일부러 안 맞물린다 —
+     * 어긋나지 않는다. 자극 길이(28.0초 · 49.7초)와는 일부러 안 맞물린다 —
      * 맞물리면 곡이 끝나는 자리가 장면 전환을 예고한다. */
 
     // 베이스 — 4분음표(0.6초). 마디마다 근음 → 근음 → 5도
@@ -496,7 +509,9 @@ const SFX = (function () {
    * 기본값은 켜짐 — 두 자극 모두 같은 기본값을 쓴다. */
   var muted = new URLSearchParams(window.location.search).get('sound') === '0';
 
-  var api = createSfx(VOICES, { muted: muted, bed: BED_VOICE });
+  /* bedLevel — 세탁 배경음과 라우드니스를 맞추는 계수. 코어의 BED 주석 참고.
+   * 이 값은 laundry-ad/tools/bed-render.js 로 재서 정했다. 층 세기를 건드리면 다시 재야 한다. */
+  var api = createSfx(VOICES, { muted: muted, bed: BED_VOICE, bedLevel: 0.60 });
   window.AD_SFX = api;
 
   /* 제스처가 생길 만한 모든 지점에서 잠금 해제를 시도한다.

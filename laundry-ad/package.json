@@ -7,6 +7,7 @@
     "test": "node test/run.js",
     "timing": "node test/timing.js",
     "storyboard": "node test/storyboard.js",
+    "bed": "node tools/bed-render.js",
     "serve": "python3 -m http.server 8000"
   },
   "devDependencies": {
