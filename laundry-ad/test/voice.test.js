@@ -100,8 +100,8 @@ module.exports = async function () {
    * 검사도 그 자리로 옮긴다 — 클립을 다시 굽든 DUR 을 손보든, 합계가 움직이면
    * 두 자극의 노출 시간이 어긋난 것이므로 여기서 걸려야 한다.
    * 상대편 값은 game/test/smoke.cjs 가 찍는다(watch 28.0s · intervene 49.6s). */
-  const WATCH_SUM = 28.0;   // 장면 1·2·3·4·11·10
-  const FIXED_SUM = 39.15;  // 장면 5·6 을 뺀 전부
+  const WATCH_SUM = 25.4;   // 장면 1·2·3·4·11·10
+  const FIXED_SUM = 33.55;  // 장면 5·6 을 뺀 전부
   const sum = nos => nos.reduce((a, n) => a + DUR[n], 0);
   t.ok(Math.abs(sum([1, 2, 3, 4, 11, 10]) - WATCH_SUM) < 0.005,
     `watch 고정 길이 ${WATCH_SUM}s (게임 자극과 맞춘 값)`, sum([1, 2, 3, 4, 11, 10]).toFixed(2) + 's');

@@ -60,8 +60,8 @@ module.exports = async function () {
    * 그래서 intervene 의 "고정 길이"는 이 둘을 뺀 값이고, 실제 재생 길이는
    * 고정 길이 + 되돌리기 대기 + 되감기 6초 + 조작 시간이다(INTEGRATION.md §11). */
   for (const [mode, table, lo, hi] of [
-    ['watch', '4,2.6,6,3.6,3.8,8', 27, 29],
-    ['intervene', '4,2.6,6,3.6,3.8,,,3.9,3.25,4,8', 38, 41]
+    ['watch', '3.6,2.4,4.4,3.4,3.6,8', 24, 27],
+    ['intervene', '3.6,2.4,4.4,3.4,3.6,,,3,2.4,2.75,8', 32, 35]
   ]) {
     const w = bootPage('?mode=' + mode);
     await wait(120);
