@@ -276,14 +276,9 @@ html, body {
  *
  * 마지막에 프레임 밖까지 올리는 이유: 손이 화면에 남아 있으면 문이 닫히는 것을
  * 보는 눈이 손으로 간다. 이 장면의 일은 "아무것도 넣지 않고 문이 닫힌다"이다. */
-@keyframes s2-hands {
-  0%,
-  24%  { transform: translate(0px, 0px); }
-  42%  { transform: translate(120px, 34px); }     /* 투입구 쪽으로 */
-  56%  { transform: translate(96px, -70px); }     /* 놓고 */
-  100% { transform: translate(40px, -520px); }    /* 프레임 밖으로 */
-}
-.s2-hands { animation: s2-hands var(--scene-dur, 5s) cubic-bezier(.3, 0, .35, 1) both; }
+/* s2-hands(옷을 들고 투입구로 내려갔다 빠지던 손)는 걷어냈다 — 아래 "손을
+ * 걷어낸 이유" 참고. 문이 닫히고(s2-door-shut) 다이얼이 돌고(s2-dial) LED 가
+ * 켜지는 것(s2-led-on)이 이미 "시작했다"를 말하고 있어서, 손이 하던 일이 없다. */
 
 /* 장면 4 의 인물 규칙(어깨 처짐 fig-sag · 고개 젓기 s4-head-deny)은 걷어냈다 —
  * 장면 4 가 클로즈업이 되면서 인물이 프레임 밖으로 나갔다. 그 자리의 감정은 옷이
@@ -766,7 +761,7 @@ html[data-state="ended"] #scene-layer { pointer-events: none; }
   66%  { translate: 1px 2px; rotate: .8deg; }
   100% { translate: -1px 0; rotate: -.3deg; }
 }
-.sc1 .cam .s1-hold { transform-box: fill-box; transform-origin: 50% 8%; }   /* 손에 닿는 윗변 */
+.sc1 .cam .s1-hold { transform-box: fill-box; transform-origin: 50% 8%; }   /* 천이 걸린 윗변 */
 .sc1 .cam .s1-hold-l { animation: s1-sway-l var(--scene-dur, 4s) ease-in-out both; }
 .sc1 .cam .s1-hold-d { animation: s1-sway-d var(--scene-dur, 4s) ease-in-out both; }
 
@@ -898,16 +893,22 @@ html[data-state="ended"] #scene-layer { pointer-events: none; }
  * 장면 끝까지 이어진다. 이 값이 상한이다: 옷과 손은 한 덩어리로 내려오는데 팔은
  * 가만히 있으므로(holdCloseup 주석), 팔 끝의 둥근 마구리(반지름 75px)보다 더
  * 내려가면 손이 팔에서 떨어져 보인다. */
+/* 손을 걷어내면서 다시 짰다. 예전에는 "눈앞으로 당겼다가(24%) 힘이 빠져
+ * 내려온다(60%~)" 였는데, 당기는 동작은 **팔이 있어야 성립한다** — 잡은 것이
+ * 없으면 옷이 저 혼자 위로 튀어 오른다.
+ *
+ * 지금은 당기지 않는다. 걸린 천이 제 무게로 계속 가라앉고 아주 조금 돈다.
+ * 위로 가는 구간이 없어서 손이 없어도 물리가 맞고, "힘이 빠진다"는 감정은
+ * 오히려 더 또렷하다. 얼룩이 진해지는 것(s4-stain-set)과 카메라가 계속
+ * 들어오는 것(cam-push4)이 같이 간다. */
 @keyframes s4-garment-check {
-  0%, 14%  { translate: 0 0; rotate: 0deg; }
-  24%      { translate: -14px -40px; rotate: -.7deg; }  /* 눈앞으로 당긴다 */
-  38%      { translate: -4px -14px; rotate: .3deg; }
-  60%      { translate: 5px 20px; rotate: -.2deg; }     /* 힘이 빠져 내려온다 */
-  100%     { translate: 11px 52px; rotate: -1.1deg; }
+  0%    { translate: 0 -6px; rotate: .25deg; }
+  38%   { translate: 3px 14px; rotate: -.3deg; }
+  100%  { translate: 9px 54px; rotate: -1.2deg; }
 }
 .sc4 .cam .hold-garment {
   transform-box: fill-box;
-  transform-origin: 50% 0%;            /* 손에 잡힌 윗변 */
+  transform-origin: 50% 0%;            /* 천이 걸린 윗변 */
   animation: s4-garment-check var(--scene-dur, 8s) cubic-bezier(.35, 0, .3, 1) both;
 }
 /* 고개 젓기(s4-head-deny)는 걷어냈다 — 장면 4 가 클로즈업이 되면서 얼굴이 프레임
@@ -954,16 +955,20 @@ html[data-state="ended"] #scene-layer { pointer-events: none; }
 }
 .sc8 .cam { animation: cam-settle8 var(--scene-dur, 3.25s) both; }
 
+/* 여기도 "눈높이로 올린다"가 아니라 **떠오른다**로 바꿨다. 올리는 주체가 없으니
+ * 천이 가벼워져 스스로 뜨는 것으로 읽혀야 한다 — 장면 4 가 가라앉는 것과 짝이 된다.
+ * 폭은 장면 4 보다 작게 둔다. 장면 8 은 개입 조건만 보는 구간이라 여기가 더
+ * 극적이면 노출 시간 비대칭 위에 각성 비대칭이 얹힌다(motion.test.js 규칙 D). */
 @keyframes s8-garment-lift {
-  0%, 12% { translate: 0 10px; rotate: -.3deg; }
-  46%     { translate: 0 -22px; rotate: .35deg; }   /* 눈높이로 올려 색을 확인한다 */
-  100%    { translate: 0 -14px; rotate: .15deg; }
+  0%   { translate: 0 12px; rotate: -.3deg; }
+  55%  { translate: 0 -10px; rotate: .3deg; }
+  100% { translate: 0 -16px; rotate: .1deg; }
 }
 /* 장면 4 와 같은 이유로 transform 이 아니라 translate/rotate 개별 속성을 쓴다 —
  * .hold-garment 안쪽에 이미 속성 transform 이 걸려 있어 덮어쓰면 옷이 원점으로 튄다. */
 .sc8 .cam .hold-garment {
   transform-box: fill-box;
-  transform-origin: 50% 0%;            /* 손에 잡힌 윗변 */
+  transform-origin: 50% 0%;            /* 천이 걸린 윗변 */
   animation: s8-garment-lift var(--scene-dur, 3.25s) cubic-bezier(.3, 0, .25, 1) both;
 }
 

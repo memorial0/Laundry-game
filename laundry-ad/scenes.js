@@ -882,27 +882,32 @@
    * 세로 화면이 채워지고, 크기 차이로 **밝은 옷이 주인공**인 것도 같이 말한다.
    *
    * **한 함수인 이유가 곧 연출이다.** 장면 11 은 장면 1 로 되돌아오는 그래픽 매치라
-   * 배치·크기·팔 각도가 한 픽셀이라도 어긋나면 "같은 자리로 돌아왔다"가 깨진다.
+   * 배치와 크기가 한 픽셀이라도 어긋나면 "같은 자리로 돌아왔다"가 깨진다.
    * 두 벌 그려 두면 한쪽만 고쳤을 때 그게 조용히 어긋난다. o.stained 하나만 다르다. */
   ART.holdPair = function (o) {
     o = o || {};
     var put = function (shape, S, X, Y) {
       var m = ART.GARMENT_BODY[shape] || ART.GARMENT_BODY.shirt;
-      return { x: X - S * m.cx, y: Y - S * m.cy, hx: X, hy: Y - S * (m.cy - m.top), s: S };
+      return { x: X - S * m.cx, y: Y - S * m.cy, s: S };
     };
-    var dark = put(V.dark.shape, 3.6, 280, 860);
-    var light = put(V.light.shape, 4.4, 760, 1180);
-    var aD = ART.armFromTop(dark.hx, dark.hy, -1, 118, 2.6);
-    var aL = ART.armFromTop(light.hx, light.hy, 1, 130, 2.6);
+    /* 손이 있을 때는 팔이 프레임 위에서 들어오는 구도라 옷이 화면 가장자리에
+     * 걸쳐도 "팔을 따라 들어온 것"으로 읽혔다. 손을 걷어내자 그냥 **잘린 옷**이
+     * 됐다(양말은 왼쪽으로, 셔츠는 오른쪽으로). 둘 다 프레임 안으로 들여놓는다.
+     *
+     * 그리는 폭은 상자 폭이 아니라 소매 끝까지다 — 셔츠는 중심에서 ±92·S,
+     * 양말은 -108·S ~ +90·S 다. 이 값으로 잡아야 가장자리에 안 닿는다. */
+    var dark = put(V.dark.shape, 3.0, 350, 780);
+    var light = put(V.light.shape, 4.0, 690, 1120);
     var p = o.cls || 's1';
 
+    /* 떠 있는 옷 아래에 타원 그림자를 깔아 봤다가 걷어냈다. 바닥 그림자의 모양인데
+     * 정작 옷은 벽 앞 허공에 있어서, 벽에 회색 웅덩이가 생긴 것으로 보였다.
+     * 잘림만 고치면 되는 문제였지 띄울 것이 없었다. */
     return ART.room({ noProps: true }) +
       '<rect x="0" y="0" width="1080" height="1920" fill="url(#g-vig)"/>' +
-      aD.arm + aL.arm +
       ART.darkGarment({ x: dark.x, y: dark.y, s: dark.s, cls: p + '-hold ' + p + '-hold-d' }) +
       ART.lightGarment({ x: light.x, y: light.y, s: light.s, stained: !!o.stained,
-        cls: p + '-hold ' + p + '-hold-l' }) +
-      aD.hand + aL.hand;
+        cls: p + '-hold ' + p + '-hold-l' });
   };
 
   ART.s1 = function (o) {
@@ -928,35 +933,24 @@
    *
    * 조건 간 비대칭은 없다 — 장면 2 는 watch·intervene 이 함께 보는 장면이다.
    *
-   * 팔은 화면 위에서 들어온다. 옷을 쥔 손이 투입구 쪽으로 내려갔다가 놓고 물러난다
-   * (s2-hands). 옷이 날아 들어가는 것은 예전 그대로 s2-toss 다 — 두 그룹이 따로
-   * 움직여야 "놓았다"가 된다. 한 그룹에 묶으면 손도 드럼 안으로 빨려 들어간다. */
+   * **그 뒤 손까지 걷어냈다** — 아래 s2 함수 주석 참고. 옷이 날아 들어가는 것은
+   * 예전 그대로 s2-toss 다. */
   ART.s2 = function (o) {
     o = o || {};
-    /* 팔뚝은 **짧고 굵어야** 팔로 보인다. 처음에는 손을 옷마다 하나씩(y 1045·1140)
-     * 두고 폭 86·74 로 그렸는데, 프레임 위에서 거기까지 내려오는 600px 짜리 가는
-     * 막대 둘이 되어 팔이 아니라 촉수였다. 손을 위로 올려 팔을 짧게 하고(340px)
-     * 폭을 130 으로 키웠다 — 길이:폭이 2.6:1 이면 팔뚝으로 읽힌다.
+    /* 손을 걷어냈다. 문이 닫히고(s2-door-shut) 다이얼이 돌고(s2-dial) LED 가
+     * 켜지는 것(s2-led-on)이 이미 "그대로 세탁 시작"을 말하고 있어서, 손이 하던
+     * 일이 없다. 팔을 짧고 굵게(340×130) 만들어 촉수로 안 보이게 하던 조정도
+     * 같이 사라졌다 — 그 문제 자체가 없어졌다.
      *
-     * 손은 밝은 옷의 **어깨**를 잡는다. 옷 상자의 원점(x,y)에 두면 옷 왼쪽 위
-     * 허공을 쥔다. 어깨 자리는 소재마다 다르므로 GARMENT_BODY 를 쓴다 —
-     * 클로즈업(holdCloseup)이 쓰는 것과 같은 표다. ver B(수건)도 저절로 맞는다.
-     *
-     * 짙은 옷은 밝은 옷 위에 얹는다. 손 셋이 필요 없고, "둘을 같이 빤다"는 이
-     * 광고의 전제가 한 뭉치로 보인다. */
+     * 짙은 옷은 밝은 옷 위에 얹는다. "둘을 같이 빤다"는 이 광고의 전제가
+     * 한 뭉치로 보인다. */
     var S = 2.6, gx = 140, gy = 700;
-    var m = ART.GARMENT_BODY[V.light.shape] || ART.GARMENT_BODY.shirt;
-    var a1 = ART.armFromTop(gx + m.gx1 * S, gy + m.gy * S, -1, 96, 1.3);
-    var a2 = ART.armFromTop(gx + m.gx2 * S, gy + m.gy * S, 1, 96, 1.3);
     return ART.room() +
       ART.washer(o.still ? { open: true } : { both: true }) +
-      // 팔은 옷 뒤 · 손은 옷 앞. 같은 클래스라 두 그룹이 같이 움직인다
-      '<g class="' + anim('s2-hands', o.still) + '">' + a1.arm + a2.arm + '</g>' +
       '<g class="' + anim('s2-toss', o.still) + '">' +
       ART.lightGarment({ x: gx, y: gy, s: S }) +
       ART.darkGarment({ x: gx + 130, y: gy + 330, s: 1.1 }) +
-      '</g>' +
-      '<g class="' + anim('s2-hands', o.still) + '">' + a1.hand + a2.hand + '</g>';
+      '</g>';
   };
 
   // 3. 실패 진행 — 짙은 색에서 염료가 번진다
@@ -1025,24 +1019,17 @@
    *   염료로 간다. 대신 옷이 처지는 연출(s4-garment-check)이 감정을 맡는다.
    *
    * 두 조건·두 버전이 같은 함수를 쓴다. stained 값 하나만 다르다. */
-  /* 옷 모양마다 다른 값 — 몸판의 중심(카메라가 맞출 자리)과 손이 잡는 어깨 위치.
+  /* 옷 모양마다 다른 몸판 중심 — 카메라와 배치가 맞출 자리.
    * 셔츠는 200×210 상자 안에서 몸판이 x54~146 뿐이라 상자 중심과 몸판 중심이 다르다.
-   * 상자를 기준으로 맞추면 옷이 화면 가운데에서 아래로 밀린다. */
+   * 상자를 기준으로 맞추면 옷이 화면 가운데에서 아래로 밀린다.
+   *
+   * 손을 걷어내면서 어깨를 쥐는 자리(gx1·gx2·gy)와 윗변(top)은 지웠다 — 쓰는 데가
+   * 없어졌고, 남겨 두면 다음 사람이 "손이 어딘가 있나" 하고 찾게 된다. */
   ART.GARMENT_BODY = {
-    shirt: { cx: 100, cy: 132, gx1: 44, gx2: 156, gy: 14, top: 8 },
-    tee:   { cx: 100, cy: 132, gx1: 44, gx2: 156, gy: 14, top: 8 },
-    towel: { cx: 100, cy: 108, gx1: 30, gx2: 170, gy: 26, top: 22 },
-    socks: { cx: 114, cy: 119, gx1: 50, gx2: 150, gy: 34, top: 32 }
-  };
-
-  /* 위에서 내려온 팔 하나 + 그 끝의 손. 클로즈업 장면들이 공유한다. */
-  ART.armFromTop = function (hx, hy, dir, w, handScale) {
-    return {
-      arm: '<path d="M' + (hx + dir * (w || 150)) + ',-120 L' + hx + ',' + hy + '"' +
-        ' stroke="' + PAL.wear + '" stroke-width="' + (w || 150) + '" stroke-linecap="round" fill="none"/>',
-      hand: '<g transform="translate(' + hx + ',' + hy + ') scale(' + (handScale || 3.4) + ')">' +
-        ART.personHand(0, 0) + '</g>'
-    };
+    shirt: { cx: 100, cy: 132 },
+    tee:   { cx: 100, cy: 132 },
+    towel: { cx: 100, cy: 108 },
+    socks: { cx: 114, cy: 119 }
   };
 
   ART.holdCloseup = function (o) {
@@ -1051,25 +1038,11 @@
     var m = ART.GARMENT_BODY[V.light.shape] || ART.GARMENT_BODY.shirt;
     var x = 540 - S * m.cx;                        // 몸판 중심을 화면 가운데로
     var y = 1000 - S * m.cy;
-    var hx1 = x + m.gx1 * S, hx2 = x + m.gx2 * S, hy = y + m.gy * S;
-
-    /* 팔은 화면 위에서 비스듬히 들어온다. 세로로 곧게 내리면 옷걸이로 보인다.
-     * 옷과 손은 한 덩어리(.hold-garment)로 움직이고 팔은 가만히 있다 — 움직임이
-     * 작고 손이 팔 끝을 덮어서 떨어져 보이지 않는다. */
-    var arm = function (hx, dir) {
-      return '<path d="M' + (hx + dir * 170) + ',-120 L' + hx + ',' + hy + '"' +
-        ' stroke="' + PAL.wear + '" stroke-width="150" stroke-linecap="round" fill="none"/>';
-    };
-    var hand = function (hx) {
-      return '<g transform="translate(' + hx + ',' + hy + ') scale(3.4)">' + ART.personHand(0, 0) + '</g>';
-    };
 
     return ART.room({ noProps: true }) +
       '<rect x="0" y="0" width="1080" height="1920" fill="url(#g-vig)"/>' +
-      arm(hx1, -1) + arm(hx2, 1) +
       '<g class="hold-garment">' +
       ART.lightGarment({ x: x, y: y, s: S, stained: !!o.stained }) +
-      hand(hx1) + hand(hx2) +
       '</g>';
   };
   // 5. 되감기 — 장면 4→3→2 역방향 후 세탁 시작 직전에 정지
