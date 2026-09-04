@@ -1054,8 +1054,23 @@ html[data-state="ended"] #scene-layer { pointer-events: none; }
   border: 0.35cqh solid rgba(53, 65, 77, 0.18);
   border-radius: 50%;
   cursor: pointer;
-  animation: s10-btn-in 800ms 400ms cubic-bezier(.2, .9, .3, 1.15) both;
+  animation: ad-close-in 800ms var(--close-delay, 1500ms) cubic-bezier(.2, .9, .3, 1.15) both;
 }
+
+/* [×] 는 CTA 보다 늦게 나온다 — 실제 광고가 닫기를 1~2초 미루는 그 문법이다.
+ * 게임 자극도 **같은 지연(1.5초)** 을 쓴다. 한쪽만 미루면 그 차이가 두 자극의
+ * CLOSE_CLICK · CTA_CLICK 비교에 그대로 들어온다(INTEGRATION.md §5-13).
+ *
+ * visibility 를 키프레임에 넣는 이유: opacity 만 0 으로 두면 **안 보이는 채로 눌린다.**
+ * 지연 중에는 fill-mode both 가 0% 를 유지하므로 hidden 이고, 그래서 못 누른다 —
+ * 참가자가 "안 보이는 버튼"을 눌러 CLOSE_CLICK 이 찍히는 일이 없다.
+ * (지연 중 눌린 것을 못 누르게만 하고 보이게 두면, 그건 눌러도 반응 없는 버튼이 된다.) */
+@keyframes ad-close-in {
+  0%   { opacity: 0; translate: 0 40px; scale: .92; visibility: hidden; }
+  1%   { visibility: visible; }
+  100% { opacity: 1; translate: 0 0; scale: 1; visibility: visible; }
+}
+
 .ad-close svg {
   width: 58%;
   height: 58%;

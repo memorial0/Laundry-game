@@ -454,9 +454,19 @@ small {
  * 크기·자리를 세탁 쪽과 같은 cq 값으로 맞춘다. 한쪽이 크거나 눈에 잘 띄면
  * 그 차이가 두 자극의 CTA_CLICK 비교에 그대로 들어온다 — .cta 와 같은 규칙이다.
  *
- * 등장 연출을 걸지 않는다. 이 카드에서는 CTA 도 그냥 떠 있다(세탁 쪽은 둘 다
- * 같은 등장 애니메이션을 쓴다). 한 자극 안에서 두 버튼의 눈에 띄는 정도가
- * 같아야 하고, 둘 다 종속변인이라 어느 쪽도 부추기면 안 된다. */
+ * **[×] 만은 늦게 나온다(1.5초).** 실제 광고가 닫기를 1~2초 미루는 그 문법이고,
+ * 세탁 자극도 **같은 지연**을 쓴다 — 한쪽만 미루면 그 차이가 두 자극의
+ * CLOSE_CLICK · CTA_CLICK 비교에 그대로 들어온다(INTEGRATION.md §5-13).
+ * CTA 는 예전처럼 처음부터 떠 있다(이 카드에서는 등장 연출이 없다).
+ *
+ * visibility 를 키프레임에 넣는 이유: opacity 만 0 으로 두면 **안 보이는 채로 눌린다.**
+ * 지연 중에는 fill-mode both 가 0% 를 유지하므로 hidden 이고, 그래서 못 누른다. */
+@keyframes ad-close-in {
+  0%   { opacity: 0; translate: 0 40px; scale: .92; visibility: hidden; }
+  1%   { visibility: visible; }
+  100% { opacity: 1; translate: 0 0; scale: 1; visibility: visible; }
+}
+
 .ad-close {
   position: absolute;
   top: 2.4cqh;
@@ -472,6 +482,7 @@ small {
   border: 0.35cqh solid rgba(207, 228, 242, 0.28);
   border-radius: 50%;
   cursor: pointer;
+  animation: ad-close-in 800ms var(--close-delay, 1500ms) cubic-bezier(.2, .9, .3, 1.15) both;
 }
 
 .ad-close svg {
