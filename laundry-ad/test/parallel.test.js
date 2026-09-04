@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const { APP_DIR, bootPage, bootArt, wait, suite } = require('./lib/harness');
 
-const SCENES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const SCENES = [1, 2, 3, 4, 11, 5, 6, 7, 8, 9, 10];   // 재생 순서 (11 은 4 뒤)
 const OTHER = SCENES.filter(n => n !== 6);
 const countTags = s => (s.match(/</g) || []).length;
 
@@ -33,12 +33,12 @@ module.exports = async function () {
     const i = bootPage('?mode=intervene&ver=A');
     await wait(120);
     const noOf = win => win.AD_ENGINE.list.map(s => s.no);
-    t.ok(noOf(w).join(',') === '1,2,3,4,10', 'watch = 실패까지 + 제품 메시지', noOf(w).join(','));
-    t.ok(noOf(i).join(',') === '1,2,3,4,5,6,7,8,9,10', 'intervene = 전 장면', noOf(i).join(','));
+    t.ok(noOf(w).join(',') === '1,2,3,4,11,10', 'watch = 실패까지 + 제품 메시지', noOf(w).join(','));
+    t.ok(noOf(i).join(',') === '1,2,3,4,11,5,6,7,8,9,10', 'intervene = 전 장면', noOf(i).join(','));
 
     // 두 조건이 공유하는 장면은 그림·자막·길이가 한 글자도 다르면 안 된다
     const COMMON = noOf(w).filter(n => noOf(i).indexOf(n) >= 0);
-    t.ok(COMMON.join(',') === '1,2,3,4,10', '공통 장면 = 1,2,3,4,10', COMMON.join(','));
+    t.ok(COMMON.join(',') === '1,2,3,4,11,10', '공통 장면 = 1,2,3,4,11,10', COMMON.join(','));
     const at = (win, no) => {
       win.AD_ENGINE.pause();
       t.ok(win.AD_ENGINE.gotoNo(no), `장면 ${no} 이동`);

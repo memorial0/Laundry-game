@@ -22,12 +22,14 @@
   var VERSIONS = {
     A: {
       id: 'A',
-      light: { name: '셔츠', josa_i: '가', use: '입을', shape: 'shirt' }, // 밝은색 대상
+      /* used·was 는 장면 11 전용이다 — "내일 입을 셔츠"(장면 1)를 과거로 받는다.
+       * was 가 소재마다 다른 것은 받침 때문이다(셔츠였다 / 수건이었다). */
+      light: { name: '셔츠', josa_i: '가', use: '입을', used: '입으려던', was: '였다', shape: 'shirt' },
       dark: { name: '양말', josa_i: '이', shape: 'socks' }                // 짙은색 이염원
     },
     B: {
       id: 'B',
-      light: { name: '수건', josa_i: '이', use: '쓸', shape: 'towel' },
+      light: { name: '수건', josa_i: '이', use: '쓸', used: '쓰려던', was: '이었다', shape: 'towel' },
       dark: { name: '티셔츠', josa_i: '가', shape: 'tee' }
     }
   };
@@ -88,6 +90,15 @@
    * 남는 시간이 빈 시간이 되지 않게 하는 것은 길이가 아니라 그 장면의 그림이 할 일이다 —
    * 장면마다 아래에 그 일을 적어 두었다. 적을 것이 없으면 늘리지 말 것.
    *
+   * **적어 두는 것만으로는 모자랐다(장면 3·4).** 두 장면 다 "할 일"이 적혀 있었는데도
+   * 말이 끝나면 멎어 보였다. 원인은 길이가 아니라 애니메이션이 전부 `--scene-dur` 를
+   * 통째로 늘려 쓴 것이었다 — 동작 하나를 6~7.4초에 얇게 펴면 정지로 읽힌다.
+   * 장면 3 은 양 끝 각속도가 0 인 곡선이라 앞뒤 1.5초에 27° 밖에 안 돌았고, 장면 4 는
+   * 확인 동작이 60% 에 끝난 뒤 3px·14px 만 표류했다. **길이는 그대로 두고 움직임을
+   * 다시 짰다**(style.css 의 s3-ramp · cam-push3 · s3-shudder · cam-push4 ·
+   * s4-garment-check · s4-stain-set). 길이를 만질 이유가 아니었다는 뜻이다 —
+   * 빈 시간이 느껴지면 먼저 그 장면의 곡선이 양 끝에서 멎는지부터 볼 것.
+   *
    * 왜 클립에서 계산하지 않고 숫자를 적어 두나
    *   voice-clips.js 는 index.html 에서 두 줄 빼면 사라질 수 있다(INTEGRATION §5-12
    *   의 되돌리는 법). 길이를 클립에서 읽으면 그때 자극 길이가 통째로 달라진다.
@@ -100,7 +111,8 @@
    *     1 목표        2.64 (A) · 2.59 (B)  →  4.00    내일 입을 옷과 오늘의 빨래를 한 화면에 두는 설정 샷
    *     2 제품 미사용 1.28                 →  2.60    아무것도 넣지 않고 문이 닫히는 것을 보게 한다
    *     3 실패 진행   0.86                 →  6.00    드럼이 돌고 물이 물드는 것을 말없이 보는 시간이 불안을 쌓는다
-   *     4 실패 결과   1.78 (A) · 1.72 (B)  →  7.40    광고의 경첩. 클로즈업으로 다시 잡은 얼룩을 읽을 시간이다
+   *     4 실패 결과   1.78 (A) · 1.72 (B)  →  3.60    광고의 경첩. 클로즈업으로 얼룩을 읽을 시간이다
+   *    11 못 입게 됨  1.70 (A) · 1.54 (B)  →  3.80    장면 1 과 같은 구도로 돌아와 손해를 셈하게 한다
    *     7 제품 작동   2.14                 →  3.90    시트가 염료를 붙잡는 과정 자체가 제품 설명이다
    *     8 개선 결과   0.99                 →  3.25    클로즈업. 색이 그대로임을 확인하는 데 시간이 든다
    *     9 결과 비교   1.33                 →  4.00    눈이 두 벌을 오가야 차이가 읽힌다. 이 카테고리의 절정
@@ -121,13 +133,13 @@
    *
    * 장면 5·6 은 길이가 참가자에게 달려 있어 이 표에 없다.
    * 장면 안의 CSS 애니메이션은 --scene-dur 로 이 값을 받아 같이 늘고 준다. */
-  var DUR = { 1: 4.0, 2: 2.6, 3: 6.0, 4: 7.4, 7: 3.9, 8: 3.25, 9: 4.0, 10: 8.0 };
+  var DUR = { 1: 4.0, 2: 2.6, 3: 6.0, 4: 3.6, 11: 3.8, 7: 3.9, 8: 3.25, 9: 4.0, 10: 8.0 };
 
   /* 장면 번호 → 클립 키. 자막이 갈리는 장면만 뒤에 판별자가 붙는다 —
-   * 1·4 는 소재(ver), 6 은 수행 주체(mode)에 따라 자막이 다르다.
+   * 1·4·11 은 소재(ver), 6 은 수행 주체(mode)에 따라 자막이 다르다.
    * voice.test.js 가 이 표를 자막 함수와 직접 대조한다. */
   function voiceKey(no) {
-    if (no === 1 || no === 4) return 's' + no + CFG.ver;
+    if (no === 1 || no === 4 || no === 11) return 's' + no + CFG.ver;
     if (no === 6) return 's6' + (CFG.mode === MODES.INTERVENE ? 'i' : 'w');
     return 's' + no;
   }
@@ -625,7 +637,9 @@
 
       stain =
         '<defs><clipPath id="' + cid + '">' + outline + '/></clipPath></defs>' +
-        '<g clip-path="url(#' + cid + ')">' +
+        /* .stain-set — 장면 4 에서만 애니메이션이 걸린다(style.css). 클립 안에 있으므로
+         * 넓혀도 옷 밖으로는 못 나간다. */
+        '<g class="stain-set" clip-path="url(#' + cid + ')">' +
         // ① 옷 전체가 탁해진다
         outline + ' fill="url(#g-dye)"/>' +
         /* ② 번진 덩어리 — 흐린 후광 · 본체 · 더 진한 속.
@@ -817,11 +831,17 @@
    * 그대로 갖고 있어 정보량은 그대로다.
    *
    * 짙은 옷이 왼쪽·밝은 옷이 오른쪽인 것은 예전 배치 그대로다. */
-  ART.s1 = function (o) {
+  /* 두 벌을 손에 든 구도 — 장면 1(빨래 전)과 장면 11(빨래 뒤)이 같이 쓴다.
+   *
+   * 둘을 나란히 같은 높이로 두면 두 물건이 대등해 보이고 화면 아래가 통째로 빈다.
+   * 짙은 옷을 왼쪽 위 · 밝은 옷을 오른쪽 아래로 어긋나게 놓아 대각선을 만든다 —
+   * 세로 화면이 채워지고, 크기 차이로 **밝은 옷이 주인공**인 것도 같이 말한다.
+   *
+   * **한 함수인 이유가 곧 연출이다.** 장면 11 은 장면 1 로 되돌아오는 그래픽 매치라
+   * 배치·크기·팔 각도가 한 픽셀이라도 어긋나면 "같은 자리로 돌아왔다"가 깨진다.
+   * 두 벌 그려 두면 한쪽만 고쳤을 때 그게 조용히 어긋난다. o.stained 하나만 다르다. */
+  ART.holdPair = function (o) {
     o = o || {};
-    /* 둘을 나란히 같은 높이로 두면 두 물건이 대등해 보이고 화면 아래가 통째로 빈다.
-     * 짙은 옷을 왼쪽 위 · 밝은 옷을 오른쪽 아래로 어긋나게 놓아 대각선을 만든다 —
-     * 세로 화면이 채워지고, 크기 차이로 **밝은 옷이 주인공**인 것도 같이 말한다. */
     var put = function (shape, S, X, Y) {
       var m = ART.GARMENT_BODY[shape] || ART.GARMENT_BODY.shirt;
       return { x: X - S * m.cx, y: Y - S * m.cy, hx: X, hy: Y - S * (m.cy - m.top), s: S };
@@ -830,13 +850,20 @@
     var light = put(V.light.shape, 4.4, 760, 1180);
     var aD = ART.armFromTop(dark.hx, dark.hy, -1, 118, 2.6);
     var aL = ART.armFromTop(light.hx, light.hy, 1, 130, 2.6);
+    var p = o.cls || 's1';
 
     return ART.room({ noProps: true }) +
       '<rect x="0" y="0" width="1080" height="1920" fill="url(#g-vig)"/>' +
       aD.arm + aL.arm +
-      ART.darkGarment({ x: dark.x, y: dark.y, s: dark.s, cls: 's1-hold s1-hold-d' }) +
-      ART.lightGarment({ x: light.x, y: light.y, s: light.s, cls: 's1-hold s1-hold-l' }) +
+      ART.darkGarment({ x: dark.x, y: dark.y, s: dark.s, cls: p + '-hold ' + p + '-hold-d' }) +
+      ART.lightGarment({ x: light.x, y: light.y, s: light.s, stained: !!o.stained,
+        cls: p + '-hold ' + p + '-hold-l' }) +
       aD.hand + aL.hand;
+  };
+
+  ART.s1 = function (o) {
+    o = o || {};
+    return ART.holdPair({ still: o.still, cls: 's1' });
   };
 
 
@@ -919,6 +946,25 @@
     return ART.holdCloseup({ stained: true, still: o.still });
   };
 
+  /* 11. 못 입게 됨 — 장면 1 로 돌아오는 그래픽 매치
+   *
+   * 장면 4 는 클로즈업으로 "색이 변했다"를 보여 준다. 그 다음에 필요한 것은 같은
+   * 말을 더 크게 하는 것이 아니라 **그래서 무엇을 잃었는지**다. 그래서 광고를 열었던
+   * 구도(두 벌을 손에 든 장면 1)로 그대로 돌아온다 — 배치도 크기도 팔 각도도 같고
+   * 밝은 옷만 얼룩져 있다. 관객이 첫 컷을 다시 보게 되므로 손해가 저절로 셈해진다.
+   *
+   * 이 장면을 넣은 이유는 시간이 남아서가 아니다. 장면 4 가 7.4초일 때 말이 끝나고
+   * 5.6초가 비었는데, 그 시간을 한 장면이 혼자 버티는 대신 두 박자로 나눈 것이다.
+   * 합은 그대로 7.4초(3.6 + 3.8)라 watch 28.0초 · 게임과의 대칭이 유지된다.
+   *
+   * **원인을 새로 만들지 않는다.** 붉은 옷을 범인으로 지목하는 컷도 후보였지만,
+   * 장면 3 이 이미 붉은 물을 보여 줬으므로 새 정보가 없고 SPEC 2장의 "실패 원인은
+   * 시트 미사용 하나"를 흐릴 위험만 있다. 여기서 말하는 것은 원인이 아니라 결과다. */
+  ART.s11 = function (o) {
+    o = o || {};
+    return ART.holdPair({ still: o.still, stained: true, cls: 's11' });
+  };
+
   /* 옷을 들어 올려 살펴보는 클로즈업 (장면 4·8·9 공용)
    *
    * 왜 전신 샷을 버렸나
@@ -999,9 +1045,12 @@
       '<rect x="60" y="120" width="316" height="100" rx="26" fill="#101725" opacity=".82"/>' +
       ART.text(218, 190, 52, '◀◀ 되감기', { fill: '#fff', weight: 700 }) +
       '</g>';
-    return '<g class="rew-f rew-f1">' + ART.s4({ still: true }) + '</g>' +
-      '<g class="rew-f rew-f2">' + ART.s3({ still: true }) + '</g>' +
-      '<g class="rew-f rew-f3">' + ART.s2({ still: true }) + '</g>' +
+    /* 첫 프레임이 장면 11 이다 — 되감기 직전에 화면에 있던 것이 그것이라,
+     * 장면 4 부터 시작하면 역재생이 앞으로 한 번 튀고 시작한다. */
+    return '<g class="rew-f rew-f1">' + ART.s11({ still: true }) + '</g>' +
+      '<g class="rew-f rew-f2">' + ART.s4({ still: true }) + '</g>' +
+      '<g class="rew-f rew-f3">' + ART.s3({ still: true }) + '</g>' +
+      '<g class="rew-f rew-f4">' + ART.s2({ still: true }) + '</g>' +
       grade + scan + badge;
   };
 
@@ -1405,6 +1454,22 @@
       render: function () { return ART.svg(ART.s4({ still: CFG.still !== null }), 'sc4'); }
     },
     {
+      /* 번호가 재생 순서와 다르다(4 다음에 나온다).
+       *
+       * 5~10 을 하나씩 밀면 CSS 클래스(.sc5~.sc10)·키프레임 이름(s6-* · s10-* …)·
+       * Scene6 모듈·scene6.test.js·나래이션 클립 키·PROSODY 표·SPEC 장면표가
+       * 전부 따라 움직여야 한다. 장면 정의(SCENES)와 재생 순서(PLAYLIST)는 원래
+       * 분리돼 있으므로(SPEC 1장), 번호를 새로 따고 순서만 PLAYLIST 에서 정한다. */
+      no: 11,
+      title: '못 입게 됨',
+      dur: DUR[11],
+      sfx: 'beat',
+      subtitle: function () {
+        return '내일 ' + V.light.used + ' ' + V.light.name + V.light.was;
+      },
+      render: function () { return ART.svg(ART.s11({ still: CFG.still !== null }), 'sc11'); }
+    },
+    {
       no: 5,
       title: '되감기',
       /* 되감기는 저절로 시작하지 않는다 — 참가자가 [되돌리기]를 눌러야 한다.
@@ -1560,8 +1625,8 @@
    * ---------------------------------------------------------- */
 
   var PLAYLIST = {
-    watch: [1, 2, 3, 4, 10],
-    intervene: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    watch: [1, 2, 3, 4, 11, 10],
+    intervene: [1, 2, 3, 4, 11, 5, 6, 7, 8, 9, 10]
   };
 
   function playlistFor(mode) {
@@ -1615,7 +1680,12 @@
     VOICE_OK: null,
     VOICE_SPOKEN: 0,                               // 읽기를 요청한 문장 수(들렸는지와 무관)
     scene_times: {},                               // 장면별 체류(초)
-    scene_enter: {}                                // 장면별 최초 진입 시각(epoch ms)
+    scene_enter: {},                               // 장면별 최초 진입 시각(epoch ms)
+    /* 재생 순서. 위 두 지도로는 순서를 알 수 없다 — 키가 정수 꼴이라 JS 가
+     * 무슨 순서로 넣든 **오름차순으로 돌려준다.** 장면 11 이 4 뒤에 나오면서
+     * 실제로 어긋났다(지도는 …4,10,11 인데 재생은 …4,11,10). 분석에서 장면을
+     * 순서대로 훑으려면 이 배열을 쓸 것. */
+    scene_order: []
   };
   window.AD_RESULT = LOG;
 
@@ -1658,7 +1728,8 @@
         VOICE_OK: Voice.voiceOk(),
         VOICE_SPOKEN: Voice.spoken,
         scene_times: st,
-        scene_enter: byNo(LOG.scene_enter)
+        scene_enter: byNo(LOG.scene_enter),
+        scene_order: LOG.scene_order.slice()
       };
     },
 
@@ -2098,6 +2169,7 @@
 
     // 조건별 재생 목록 — Debug 패널이 이 목록으로 점프 버튼을 만들므로 먼저 정한다
     Engine.list = CFG.still !== null ? SCENES : playlistFor(CFG.mode);
+    LOG.scene_order = Engine.list.map(function (s) { return s.no; });
 
     // 중도 이탈 대비 — 스키마 그대로 저장하되 t_end = 0 (미완료)
     window.addEventListener('pagehide', function () {

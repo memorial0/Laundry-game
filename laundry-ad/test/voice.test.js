@@ -20,7 +20,7 @@ const { bootPage, wait, suite, APP_DIR } = require('./lib/harness');
  * 그 함수가 틀렸을 때 같이 틀린다. 규칙을 독립적으로 진술해 둔다.
  *   1·4 는 소재(ver)에 따라, 6 은 수행 주체(mode)에 따라 자막이 갈린다. */
 function keyFor(no, mode, ver) {
-  if (no === 1 || no === 4) return 's' + no + ver;
+  if (no === 1 || no === 4 || no === 11) return 's' + no + ver;
   if (no === 6) return 's6' + (mode === 'intervene' ? 'i' : 'w');
   return 's' + no;
 }
@@ -33,13 +33,20 @@ module.exports = async function () {
 
   /* ---- 문장이 자막과 같다 ---- */
   const used = new Set();
+  /* 장면 번호를 여기 옮겨 적지 않고 엔진에서 읽는다 — 옮겨 적으면 장면이 늘 때
+   * 이 검사만 조용히 옛 목록을 돌아 새 장면의 자막을 아무도 안 본다.
+   * ?still 은 조건과 무관하게 전 장면을 준다. */
+  const wList = bootPage('?mode=intervene&ver=A&still=1&sid=v-list');
+  await wait(80);
+  const NOS = wList.AD_ENGINE.list.map(s => s.no);
+
   for (const mode of ['watch', 'intervene']) {
     for (const ver of ['A', 'B']) {
       /* ?still 로 장면을 하나씩 세워 자막을 읽는다. 재생으로 걸으면 watch 는
        * 1·2·3·4·10 만 지나 장면 5~9 의 자막을 확인할 수 없다. */
       t.section(mode + ' · ver ' + ver);
       let mismatch = null;
-      for (let no = 1; no <= 10; no++) {
+      for (const no of NOS) {
         const w = bootPage(`?mode=${mode}&ver=${ver}&still=${no}&sid=v-${mode}${ver}${no}`);
         await wait(80);
         const sub = w.document.getElementById('subtitle-text').textContent;
@@ -48,7 +55,7 @@ module.exports = async function () {
         const said = w.AD_VOICE_CLIPS.text[key];
         if (said !== sub) mismatch = { no, key, sub, said };
       }
-      t.ok(!mismatch, '열 장면 모두 자막을 그대로 읽는다',
+      t.ok(!mismatch, NOS.length + ' 장면 모두 자막을 그대로 읽는다',
         mismatch && `장면 ${mismatch.no}(${mismatch.key}) 자막 "${mismatch.sub}" ≠ 클립 "${mismatch.said}"`);
     }
   }
@@ -93,13 +100,13 @@ module.exports = async function () {
    * 검사도 그 자리로 옮긴다 — 클립을 다시 굽든 DUR 을 손보든, 합계가 움직이면
    * 두 자극의 노출 시간이 어긋난 것이므로 여기서 걸려야 한다.
    * 상대편 값은 game/test/smoke.cjs 가 찍는다(watch 28.0s · intervene 49.6s). */
-  const WATCH_SUM = 28.0;   // 장면 1·2·3·4·10
+  const WATCH_SUM = 28.0;   // 장면 1·2·3·4·11·10
   const FIXED_SUM = 39.15;  // 장면 5·6 을 뺀 전부
   const sum = nos => nos.reduce((a, n) => a + DUR[n], 0);
-  t.ok(Math.abs(sum([1, 2, 3, 4, 10]) - WATCH_SUM) < 0.005,
-    `watch 고정 길이 ${WATCH_SUM}s (게임 자극과 맞춘 값)`, sum([1, 2, 3, 4, 10]).toFixed(2) + 's');
-  t.ok(Math.abs(sum([1, 2, 3, 4, 7, 8, 9, 10]) - FIXED_SUM) < 0.005,
-    `intervene 고정분 ${FIXED_SUM}s (게임 자극과 맞춘 값)`, sum([1, 2, 3, 4, 7, 8, 9, 10]).toFixed(2) + 's');
+  t.ok(Math.abs(sum([1, 2, 3, 4, 11, 10]) - WATCH_SUM) < 0.005,
+    `watch 고정 길이 ${WATCH_SUM}s (게임 자극과 맞춘 값)`, sum([1, 2, 3, 4, 11, 10]).toFixed(2) + 's');
+  t.ok(Math.abs(sum([1, 2, 3, 4, 11, 7, 8, 9, 10]) - FIXED_SUM) < 0.005,
+    `intervene 고정분 ${FIXED_SUM}s (게임 자극과 맞춘 값)`, sum([1, 2, 3, 4, 11, 7, 8, 9, 10]).toFixed(2) + 's');
 
   /* 장면 10 만은 연출이 아니라 측정 때문에 8초다 — 게임 제품 카드와 같아야 한다.
    * CTA_CLICK 이 종속변인이라 여기가 어긋나면 클릭률 차이에 "누를 시간"이 섞인다. */
@@ -120,7 +127,7 @@ module.exports = async function () {
     '말 속도·높이가 클립마다 기록돼 있다');
 
   const no = k => Number(k.replace(/^s(\d+).*$/, '$1'));
-  const SHARED_SC = [1, 2, 3, 4, 10];
+  const SHARED_SC = [1, 2, 3, 4, 11, 10];   // 11 은 watch·intervene 둘 다 본다
   const span = ks => Math.max(...ks.map(k => semi[k])) - Math.min(...ks.map(k => semi[k]));
 
   t.ok(semi.s4A === Math.min(...have.map(k => semi[k])),

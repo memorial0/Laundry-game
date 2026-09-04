@@ -41,7 +41,7 @@ module.exports = async function () {
       await wait(20);
     }
     seen.push(E.scene.no);
-    t.ok(seen.join(',') === '1,2,3,4,10', 'watch = 실패까지 + 제품 메시지', seen.join(','));
+    t.ok(seen.join(',') === '1,2,3,4,11,10', 'watch = 실패까지 + 제품 메시지', seen.join(','));
     t.ok(w.__errors.length === 0, '스크립트 오류 없음', w.__errors.map(String));
 
     // 장면 하나만 남고 이전 장면은 정리된다
@@ -60,8 +60,8 @@ module.exports = async function () {
    * 그래서 intervene 의 "고정 길이"는 이 둘을 뺀 값이고, 실제 재생 길이는
    * 고정 길이 + 되돌리기 대기 + 되감기 6초 + 조작 시간이다(INTEGRATION.md §11). */
   for (const [mode, table, lo, hi] of [
-    ['watch', '4,2.6,6,7.4,8', 27, 29],
-    ['intervene', '4,2.6,6,7.4,,,3.9,3.25,4,8', 38, 41]
+    ['watch', '4,2.6,6,3.6,3.8,8', 27, 29],
+    ['intervene', '4,2.6,6,3.6,3.8,,,3.9,3.25,4,8', 38, 41]
   ]) {
     const w = bootPage('?mode=' + mode);
     await wait(120);

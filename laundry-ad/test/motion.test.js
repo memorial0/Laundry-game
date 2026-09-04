@@ -27,7 +27,7 @@ const { APP_DIR, suite } = require('./lib/harness');
 
 const CSS = fs.readFileSync(path.join(APP_DIR, 'style.css'), 'utf8');
 
-const SHARED = [1, 2, 3, 4, 10];      // watch·intervene 재생 목록의 교집합
+const SHARED = [1, 2, 3, 4, 11, 10];      // watch·intervene 재생 목록의 교집합
 const INT_ONLY = [5, 6, 7, 8, 9];     // intervene 만 보는 구간
 
 /* 조건·버전을 가르는 선택자 조각. 이 중 하나라도 붙으면 그 규칙은 참가자에 따라
