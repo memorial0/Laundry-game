@@ -29,6 +29,7 @@ const APP_DIR = path.resolve(__dirname, '..');
 const OUT = path.join(__dirname, 'out');
 const SCENES = [1, 2, 3, 4, 11, 5, 6, 7, 8, 9, 10];  // 재생 순서 (11 은 4 뒤)
 const W = 540, H = 960;          // 9:16 — 예전 출력과 같은 크기
+const MIN_PNG = 12000;           // 이보다 작으면 안 그려진 것으로 본다 (아래 shoot 주석)
 const COLS = 6;                  // 컨택트시트 6 × 2 (장면 11 장, 마지막 칸은 빈다)
 
 /* ---------------------------------------------------------------
@@ -115,6 +116,15 @@ function shoot(chrome, url, outFile, w, h) {
     ], { timeout: 60000 }, (err) => {
       if (err) return reject(new Error('캡처 실패 (' + url + '): ' + err.message.split('\n')[0]));
       if (!fs.existsSync(outFile)) return reject(new Error('캡처 실패 — 파일이 안 생김: ' + url));
+      /* 파일이 생겼는지만 보면 안 된다. 크롬이 그리기 전에 찍으면 **방 배경만 있는
+       * 빈 그림**이 나오는데, 그것도 파일은 파일이라 통과한다. 실제로 ver B 장면 1 이
+       * 통째로 빈 채 나왔고 DOM 을 따로 확인하고서야 캡처 실패인 줄 알았다 —
+       * 그림을 보고 판단하는 도구가 조용히 틀린 그림을 주면 도구가 없느니만 못하다.
+       * 한 색으로 채운 9:16 PNG 가 대략 3KB 라, 그보다 크게 잡는다. */
+      var size = fs.statSync(outFile).size;
+      if (size < MIN_PNG) {
+        return reject(new Error('캡처가 비었다 (' + size + 'B < ' + MIN_PNG + 'B): ' + url));
+      }
       resolve(outFile);
     });
   });
@@ -129,7 +139,14 @@ async function render(chrome, port, ver, mode) {
     const f = path.join(dir, 'scene-' + String(n).padStart(2, '0') + '.png');
     const url = 'http://127.0.0.1:' + port + '/index.html' +
       '?still=' + n + '&ver=' + ver + '&mode=' + mode + '&sound=0&sid=storyboard';
-    await shoot(chrome, url, f, W, H);
+    // 빈 캡처는 드물게 나므로 한 번 더 시도한다. 두 번 다 비면 그때는 진짜 문제다.
+    try {
+      await shoot(chrome, url, f, W, H);
+    } catch (e) {
+      if (!/비었다/.test(e.message)) throw e;
+      console.log('  (장면 ' + n + ' 캡처가 비어 다시 찍습니다)');
+      await shoot(chrome, url, f, W, H);
+    }
     files.push(f);
   }
 

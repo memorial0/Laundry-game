@@ -513,13 +513,43 @@
     var outline = '';
 
     if (kind === 'shirt' || kind === 'tee') {
-      outline = '<path d="M70,14 L44,6 L8,44 L40,80 L54,64 L54,200 L146,200 L146,64 L160,80 L192,44 L156,6 L130,14' +
+      /* 예전 외곽선은 직선 여덟 개짜리였고 몸판이 **완전한 직사각형**이었다
+       * (L54,200 L146,200 L146,64 — 옆선 수직 · 밑단 수평 · 모서리 직각).
+       * 소매도 사각형이라, 7초 넘게 화면을 채우는 클로즈업에서 옷이 아니라
+       * 앞치마나 환자복으로 읽혔다. 손이 잡고 있을 때는 "누가 들고 있어서
+       * 뻣뻣하다"로 넘어갔지만 그 변명은 손을 빼면 사라진다.
+       *
+       * 천이 걸려 있을 때 실제로 생기는 네 가지를 넣었다.
+       *   어깨 경사   목에서 소매머리로 완만히 흘러내린다 (직선 꺾임이 아니다)
+       *   소맷부리    둥글게 벌어진다 (직선 절단면이 아니다)
+       *   옆선        허리에서 살짝 들어갔다 밑단에서 다시 벌어진다
+       *   밑단        가운데가 처져 완만한 호를 그리고 모서리가 둥글다
+       *
+       * 좌우는 x=100 을 축으로 대칭이다. 대칭을 깨면 옷이 비뚤어 보이는데,
+       * 그건 드레이프가 아니라 그리다 만 것으로 읽힌다.
+       *
+       * 이 path 는 보이는 몸판과 **얼룩을 자르는 clipPath 가 같이 쓴다.**
+       * 모양을 고치면 얼룩이 잘리는 자리도 같이 움직인다(그게 맞다). */
+      outline = '<path d="M70,14 C61,10 52,7 44,6 C31,15 17,29 8,44' +
+        ' C17,57 28,70 40,80 C46,76 50,70 54,64' +
+        ' C57,105 57,148 55,186 C68,197 84,201 100,201' +
+        ' C116,201 132,197 145,186 C143,148 143,105 146,64' +
+        ' C150,70 154,76 160,80 C172,70 183,57 192,44' +
+        ' C183,29 169,15 156,6 C148,7 139,10 130,14' +
         ' C122,42 78,42 70,14 Z"';
       body =
         outline + ' fill="' + fill + '" stroke="' + edge + '" stroke-width="5" stroke-linejoin="round"/>' +
-        // 소매·옆선 음영
-        '<path d="M54,64 L54,200 L86,200 L86,70 Z" fill="' + shade + '" opacity=".5"/>' +
-        '<path d="M8,44 L40,80 L54,64 L30,34 Z" fill="' + shade + '" opacity=".35"/>';
+        // 옆선 음영 — 새 옆선·밑단 곡선을 따라간다
+        '<path d="M54,64 C57,105 57,148 55,186 C66,195 76,199 86,200 L86,66 Z"' +
+        ' fill="' + shade + '" opacity=".5"/>' +
+        '<path d="M8,44 C17,57 28,70 40,80 C46,76 50,70 54,64 L30,34 Z"' +
+        ' fill="' + shade + '" opacity=".35"/>' +
+        /* 접힘 두 줄. 실루엣만 고치면 안쪽이 여전히 색종이라 천으로 안 읽힌다.
+         * 세로로 아주 옅게 — 진하면 옷에 줄무늬가 있는 것이 된다. */
+        '<path d="M74,72 C71,110 71,152 73,190" fill="none" stroke="' + shade +
+        '" stroke-width="6" stroke-linecap="round" opacity=".28"/>' +
+        '<path d="M127,74 C130,112 130,154 128,192" fill="none" stroke="' + shade +
+        '" stroke-width="5" stroke-linecap="round" opacity=".2"/>';
       if (kind === 'shirt') {
         body += '<path d="M70,14 L100,54 L130,14" fill="none" stroke="' + edge + '" stroke-width="5" stroke-linejoin="round"/>' +
           '<path d="M62,10 L100,54 L86,60 Z M138,10 L100,54 L114,60 Z" fill="' + shade + '" opacity=".55" stroke="' + edge + '" stroke-width="3"/>' +
@@ -529,15 +559,29 @@
           '<circle cx="100" cy="164" r="5" fill="' + edge + '"/>';
       } else {
         body += '<path d="M70,16 q30,26 60,-2" fill="none" stroke="' + edge + '" stroke-width="7"/>' +
-          '<path d="M60,192 h80" stroke="' + edge + '" stroke-width="4" opacity=".6"/>';
+          // 밑단 스티치도 새 밑단 호를 따라간다 (예전엔 h80 짜리 수평선이었다)
+          '<path d="M62,190 C76,197 88,200 100,200 C112,200 124,197 138,190"' +
+          ' fill="none" stroke="' + edge + '" stroke-width="4" opacity=".6"/>';
       }
     } else if (kind === 'towel') {
+      /* 수건은 원래 사각형인 물건이라 실루엣을 셔츠처럼 고치지 않는다. ver B 참가자가
+       * 절반이라 여기만 색종이로 남으면 그게 곧 버전 간 완성도 차이가 되므로, 천
+       * 느낌은 **접힘 두 줄로만** 준다 — 셔츠에 넣은 것과 같은 세기다.
+       *
+       * 밑단을 가운데로 처지게도 해 봤다가 되돌렸다. 클로즈업(holdCloseup)에서 수건이
+       * 화면을 가득 채우는데, 아래가 둥글면 걸린 천이 아니라 **자루나 가방**으로 읽힌다.
+       * 위쪽 걸이 고리까지 있어서 더 그렇다. 셔츠에서 통한 것이 여기서는 안 통한다. */
       outline = '<rect x="22" y="20" width="156" height="176" rx="12"';
       body =
         outline + ' fill="' + fill + '" stroke="' + edge + '" stroke-width="5"/>' +
         '<rect x="22" y="20" width="42" height="176" rx="12" fill="' + shade + '" opacity=".45"/>' +
         '<rect x="30" y="128" width="140" height="13" rx="6" fill="' + edge + '"/>' +
         '<rect x="30" y="152" width="140" height="13" rx="6" fill="' + edge + '" opacity=".7"/>' +
+        // 접힘 두 줄 (셔츠와 같은 세기)
+        '<path d="M78,34 C75,80 75,130 77,186" fill="none" stroke="' + shade +
+        '" stroke-width="6" stroke-linecap="round" opacity=".28"/>' +
+        '<path d="M131,36 C134,82 134,132 132,188" fill="none" stroke="' + shade +
+        '" stroke-width="5" stroke-linecap="round" opacity=".2"/>' +
         // 아랫단 술
         '<path d="M32,196 v14 M52,196 v14 M72,196 v14 M92,196 v14 M112,196 v14 M132,196 v14 M152,196 v14 M168,196 v14"' +
         ' stroke="' + edge + '" stroke-width="5" stroke-linecap="round"/>' +
