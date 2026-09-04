@@ -9,7 +9,7 @@ const SCHEMA = ['sid', 'mode', 'ver', 't_start', 't_end', 'DWELL_TOTAL', 'DWELL_
   'REDUCED_MOTION', 'AUDIO_OK', 'SFX_COUNT',
   // 나래이션 — 세탁 자극에만 있다(게임에는 짝이 없다). INTEGRATION.md §5-12
   'VOICE_OK', 'VOICE_SPOKEN',
-  'scene_times', 'scene_enter'];
+  'scene_times', 'scene_enter', 'scene_order'];
 
 const done = w => (w.__messages.find(m => m && m.type === 'AD_DONE') || {}).payload;
 
@@ -42,11 +42,15 @@ module.exports = async function () {
     'REDUCED_MOTION 기록(자극에는 영향 없음)', p.REDUCED_MOTION);
   t.ok(p.t_start > 0 && p.t_end >= p.t_start, 't_start/t_end epoch ms');
   t.ok(Math.abs(p.DWELL_TOTAL - (p.t_end - p.t_start) / 1000) < 0.02, 'DWELL_TOTAL = t_end - t_start');
-  t.ok(Object.keys(p.scene_times).join(',') === '1,2,3,4,10', 'scene_times = watch 재생 목록');
-  t.ok(Object.keys(p.scene_enter).join(',') === '1,2,3,4,10', 'scene_enter = watch 재생 목록');
-  const enters = Object.keys(p.scene_enter).map(k => p.scene_enter[k]);
+  t.ok(p.scene_order.join(',') === '1,2,3,4,11,10', 'scene_order = watch 재생 순서',
+    p.scene_order.join(','));
+  /* 지도의 키 순서는 재생 순서가 아니다 — 정수 꼴 키라 JS 가 오름차순으로 돌려준다.
+   * 장면 11 이 4 뒤에 나오므로 지도는 …4,10,11 이 된다. 순서는 scene_order 로 본다. */
+  t.ok(Object.keys(p.scene_times).join(',') === '1,2,3,4,10,11', 'scene_times = 장면 번호순');
+  t.ok(Object.keys(p.scene_enter).join(',') === '1,2,3,4,10,11', 'scene_enter = 장면 번호순');
+  const enters = p.scene_order.map(n => p.scene_enter[n]);
   t.ok(enters.every((v, i) => v >= p.t_start && (i === 0 || v >= enters[i - 1])),
-    'scene_enter = t_start 이후의 오름차순 epoch ms');
+    'scene_enter = t_start 이후, 재생 순서대로 오름차순 epoch ms');
 
   const before = a.__messages.length;
   E.finish();

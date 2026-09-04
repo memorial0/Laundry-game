@@ -43,7 +43,9 @@ html, body {
   max-width: 100vw;
   max-height: 100dvh;
   overflow: hidden;
-  background: #eef1f5;
+  /* 첫 장면이 그려지기 전 한 프레임 보이는 바닥. 방 색(PAL.wall)과 맞춰 둔다 —
+     밝은 값으로 두면 어두워진 장면 1 앞에 흰 섬광이 한 번 친다. */
+  background: #AEB9C4;
   container-type: size;
 }
 
@@ -127,7 +129,7 @@ html, body {
  * 괄호 안 옛 값은 fallback 이다 — ?still 캡처처럼 변수가 안 걸리는 경로에서
  * 예전 길이 그대로 돈다. 전환 연출(cut-*)과 등장 팝(s10-pack·s10-btn-in)은
  * 장면 길이와 무관한 고정 시간이라 그대로 둔다.
- * 무한 반복(s3-drift·s7-absorb·s6-ring…)도 마찬가지다.
+ * 무한 반복(drum-slosh·s7-absorb·s6-ring…)도 마찬가지다.
  */
 
 /* ---- 장면별 애니메이션 (②단계 플레이스홀더 모션) ----
@@ -194,6 +196,17 @@ html, body {
 .scene:has(.cam)[data-scene="3"].is-out { animation: cut-hard-out 110ms linear both; }
 .scene:has(.cam)[data-scene="4"].is-in  { animation: cut-snap-in 200ms cubic-bezier(.2, .9, .3, 1) both; }
 
+/* 4 → 11 · 당겨 빠지기. 클로즈업에서 장면 1 의 넓은 구도로 돌아오는 컷이라,
+ * 들어오는 화면이 살짝 크게 시작해 제자리로 물러난다 — 카메라가 뒤로 빠지는
+ * 느낌이 컷 자체에 실린다. 하드 컷(3→4)과 달리 여기는 때리지 않는다. 때릴 일은
+ * 이미 장면 4 에서 끝났고, 이 장면이 하는 일은 손해를 세는 것이다. */
+@keyframes cut-pull-in {
+  0%   { opacity: 0; transform: scale(1.10); }
+  40%  { opacity: 1; }
+  100% { opacity: 1; transform: scale(1); }
+}
+.scene:has(.cam)[data-scene="11"].is-in { animation: cut-pull-in 420ms cubic-bezier(.2, .75, .25, 1) both; }
+
 /* → 10 · 거품 와이프. 팩샷은 비누 거품이 열리듯 드러난다. 세제 광고가 거품으로
  * 화면을 넘기는 그 문법이다. 92% 는 세로 화면에서 네 모서리를 다 덮는 값이다
  * (가장 먼 모서리까지가 약 85%). watch 는 장면 4에서, intervene 은 장면 9에서
@@ -226,8 +239,13 @@ html, body {
 /* 장면 4 는 이제 처음부터 클로즈업이다(하드 컷으로 얼룩에 들어간다). 카메라는
  * 거기서 아주 조금 더 밀어 정지 화면으로 안 읽히게만 한다 — 예전 값(1 → 1.575배)은
  * 방 전체 와이드 샷에서 다가가는 움직임이라 지금 구도에서는 옷이 프레임을 넘친다. */
+/* 예전 곡선은 끝 기울기가 0 이라 카메라가 장면 중반에 이미 멈춰 있었다. 옷의
+ * 확인 동작도 60% 에 끝나므로 뒤 3초가 통째로 정지였다. 이제 55% 까지 거리의
+ * 70% 를 밀고, 남은 3.3초는 등속으로 계속 들어간다 — 느리지만 멈추지는 않는다.
+ * 경계 각속도를 맞춘 계산: (1-.738)/(1-.5) = .524 × 앞 구간 평균 = 뒤 구간 등속. */
 @keyframes cam-push4 {
-  0%   { transform: translate(0px, 0px) scale(1); animation-timing-function: cubic-bezier(.33, 0, .12, 1); }
+  0%   { transform: translate(0px, 0px) scale(1); animation-timing-function: cubic-bezier(.2, 0, .5, .738); }
+  55%  { transform: translate(-22.7px, -40.3px) scale(1.042); animation-timing-function: linear; }
   100% { transform: translate(-32.4px, -57.6px) scale(1.06); }
 }
 .sc4 .cam { animation: cam-push4 var(--scene-dur, 8s) both; }
@@ -246,40 +264,21 @@ html, body {
  * 장면 1 이 클로즈업이 되면서 인물이 프레임 밖으로 나갔다. 두 옷이 흔들리는
  * 연출(s1-sway-l · s1-sway-d)이 남아 화면이 정지로 안 읽히게 한다. */
 
-/* 장면 2 인물 — 던지는 뒤따름.
+/* 장면 2 의 손 — 넣고 놓고 물러난다.
  *
- * s2-toss 는 1.4초 뒤에 시작해 옷만 세탁기로 날려 보냈다. 정작 던진 사람은
- * 미동도 없었다. 팔을 세탁기 쪽으로 올렸다 내리고 몸통이 따라 기울게 한다.
- * 5초 기준 28% 가 1.4초 — 옷이 출발하는 순간에 맞춘다.
+ * 예전에는 전신 인물이 서서 빨래를 던졌고(fig-toss-arms · fig-toss-body) 그 인물이
+ * 아동 도서 삽화였다. 인물을 걷어내고 화면 위에서 들어오는 팔과 손만 남겼다
+ * (scenes.js 의 ART.s2 주석). 두 규칙 다 그때 같이 걷어냈다.
  *
- * 팔은 회전이 아니라 이동으로 든다. 양팔을 한 덩어리로 회전시키면 한쪽은 올라가고
- * 반대쪽은 내려가서 두 손으로 넣는 동작이 안 된다. */
-@keyframes fig-toss-arms {
-  0%,
-  26%  { translate: 0 0; rotate: 0deg; }
-  33%  { translate: -3px 4px; rotate: 1.5deg; }    /* 살짝 뒤로 모았다가 */
-  44%  { translate: 11px -23px; rotate: -5deg; }   /* 투입구 쪽으로 */
-  62%  { translate: 4px -7px; rotate: -1.5deg; }
-  100% { translate: 0 0; rotate: 0deg; }
-}
-@keyframes fig-toss-body {
-  0%,
-  26%  { translate: 0 0; rotate: 0deg; }
-  33%  { translate: -2px 0; rotate: -1.2deg; }
-  46%  { translate: 5px 0; rotate: 3.4deg; }
-  70%  { translate: 1px 0; rotate: .8deg; }
-  100% { translate: 0 0; rotate: 0deg; }
-}
-.sc2 .cam .person .arms {
-  transform-box: fill-box;
-  transform-origin: 50% 0%;            /* 어깨 */
-  animation: fig-toss-arms var(--scene-dur, 5s) cubic-bezier(.3, 0, .35, 1) both;
-}
-.sc2 .cam .person {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-  animation: fig-toss-body var(--scene-dur, 5s) cubic-bezier(.3, 0, .35, 1) both;
-}
+ * 손과 옷은 **다른 그룹이고 다른 애니메이션**이다. 한 그룹으로 묶으면 손도 옷을
+ * 따라 드럼 안으로 빨려 들어간다. 지금은 손이 투입구 쪽으로 내려갔다가(42%)
+ * 옷을 놓고 위로 빠진다 — s2-toss 가 28% 에 시작하므로 그 직후다.
+ *
+ * 마지막에 프레임 밖까지 올리는 이유: 손이 화면에 남아 있으면 문이 닫히는 것을
+ * 보는 눈이 손으로 간다. 이 장면의 일은 "아무것도 넣지 않고 문이 닫힌다"이다. */
+/* s2-hands(옷을 들고 투입구로 내려갔다 빠지던 손)는 걷어냈다 — 아래 "손을
+ * 걷어낸 이유" 참고. 문이 닫히고(s2-door-shut) 다이얼이 돌고(s2-dial) LED 가
+ * 켜지는 것(s2-led-on)이 이미 "시작했다"를 말하고 있어서, 손이 하던 일이 없다. */
 
 /* 장면 4 의 인물 규칙(어깨 처짐 fig-sag · 고개 젓기 s4-head-deny)은 걷어냈다 —
  * 장면 4 가 클로즈업이 되면서 인물이 프레임 밖으로 나갔다. 그 자리의 감정은 옷이
@@ -355,39 +354,79 @@ html, body {
  *
  * 도는 것은 옷 두 개뿐이다. 드럼 타공은 ART.drum 이 이 그룹 밖에 그리므로
  * 빨라져도 무늬가 깜빡이지 않는다(기기 주사율에 따라 달라 보일 일이 없다). */
+/* 곡선 하나(cubic-bezier(.62,0,.38,1))로 6초를 다 덮던 것을 세 구간으로 나눴다.
+ * 그 곡선은 양 끝 기울기가 정확히 0 이라, 앞 1.5초와 뒤 1.5초 동안 드럼이 겨우
+ * 27° 돌았다 — 말이 끝난 뒤 화면이 멎어 있다고 느껴지던 자리가 여기다.
+ * 이제 앞뒤 구간에서 각각 150° 를 돌아 다섯 배 이상 움직인다. 전체 회전량은
+ * 1150°(3.2바퀴) 그대로다 — 줄인 것은 길이가 아니라 멎어 있는 시간이다.
+ *
+ * 구간 경계에서 각속도를 맞춰 두었다(양쪽 다 253°/s). 안 맞추면 경계에서 속도가
+ * 계단처럼 튀어 변속기처럼 보인다 — 아래 두 값이 그 계산이다.
+ *   가속 구간 끝 기울기 (1-.265)/(1-.67) = 2.23 × 구간 평균 113.6°/s = 253°/s
+ *   감속 구간 첫 기울기      .735/.33      = 2.23 × 〃                = 253°/s */
 @keyframes s3-ramp {
-  0%   { transform: rotate(0deg); }
+  0%   { transform: rotate(0deg);    animation-timing-function: cubic-bezier(.33, 0, .67, .265); }
+  22%  { transform: rotate(150deg);  animation-timing-function: linear; }
+  78%  { transform: rotate(1000deg); animation-timing-function: cubic-bezier(.33, .735, .67, 1); }
   100% { transform: rotate(1150deg); }
 }
 .s3-tumble {
   transform-box: fill-box;
   transform-origin: 50% 50%;
-  animation: s3-ramp var(--scene-dur, 6s) cubic-bezier(.62, 0, .38, 1) both;
+  animation: s3-ramp var(--scene-dur, 6s) linear both;
 }
 /* 염료 번짐은 드럼 램프와 같은 곡선·같은 길이로 간다. 예전엔 5.6초 ease-in 이라
  * 드럼이 25배로 빨라졌다 멎는 동안 저 혼자 제 시계로 번졌다. 이제 드럼이 가장 빠른
  * 한가운데에서 염료도 가장 빠르게 퍼진다(s3-ramp 와 같은 cubic-bezier). */
-@keyframes s3-tint { 0% { opacity: 0; } 100% { opacity: .75; } }
-.s3-tint { animation: s3-tint var(--scene-dur, 6s) cubic-bezier(.62, 0, .38, 1) both; }
-
-@keyframes s3-drift {
-  0%   { opacity: 0; transform: none; }
-  25%  { opacity: .9; }
-  100% { opacity: .35; transform: translate(var(--tx), var(--ty)); }
+@keyframes s3-tint {
+  0%   { opacity: 0;    animation-timing-function: cubic-bezier(.33, 0, .67, .265); }
+  22%  { opacity: .098; animation-timing-function: linear; }   /* .75 × 150/1150 */
+  78%  { opacity: .652; animation-timing-function: cubic-bezier(.33, .735, .67, 1); }
+  100% { opacity: .75; }
 }
-/* 3.4초는 6초 장면에서 1.76주기라 마지막 한 바퀴가 하드 컷에 잘려 나갔다.
- * 3초면 정확히 두 바퀴가 끝나고 장면이 넘어간다. */
-.s3-drift { opacity: 0; animation: s3-drift 3s ease-out infinite; }
+.s3-tint { animation: s3-tint var(--scene-dur, 6s) linear both; }
+
+/* 수면이 출렁인다.
+ *
+ * 드럼 안이 "물"로 보이려면 수면이 움직여야 한다 — 고인 채 가만히 있으면 색칠한
+ * 반원이다. 좌우 이동과 아주 작은 기울기를 겹쳐 한쪽으로 쏠렸다 돌아오게 한다.
+ *
+ * 물결 path 가 드럼보다 넓게(84~944 vs 198~882) 그려져 있어 ±40px 로 움직여도
+ * 가장자리에서 물이 끝나는 것이 안 보인다.
+ *
+ * 드럼 회전(s3-ramp, 6초에 한 번 감았다 멎음)과 **일부러 주기를 안 맞춘다.**
+ * 맞물리면 물이 드럼에 붙어 같이 도는 것처럼 보인다 — 물은 드럼과 따로 논다.
+ * 장면 3(6초)·장면 7(3.9초) 어느 쪽 길이와도 나누어떨어지지 않는 4.3초다. */
+@keyframes drum-slosh {
+  0%   { transform: translate(-24px, 0) rotate(-.5deg); }
+  50%  { transform: translate(26px, -5px) rotate(.55deg); }
+  100% { transform: translate(-24px, 0) rotate(-.5deg); }
+}
+.drum-slosh {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: drum-slosh 4.3s ease-in-out infinite;
+}
+
+/* s3-drift(장면 3 의 떠다니는 염료 입자)는 걷어냈다 — 물이 붉어지는 것으로 이미
+ * 말이 되고, 또렷한 원 열두 개가 물 위에 뜨면 그게 배양접시의 세포로 읽혔다.
+ * 입자는 장면 7 에만 남는다(s7-absorb — 시트가 염료를 붙잡는 그림이라 하나하나가
+ * 보여야 한다). part-static 은 그 장면의 ?still 캡처용 대역이라 남긴다. */
 .part-static { opacity: .7; }
 
 /* 5. 되감기 — 4 → 3 → 2 역방향, 세탁 시작 직전에 정지 */
 .rew-f { opacity: 0; }
-@keyframes rew-f1 { 0%, 20% { opacity: 1; } 21%, 100% { opacity: 0; } }
-@keyframes rew-f2 { 0%, 20% { opacity: 0; } 21%, 44% { opacity: 1; } 45%, 100% { opacity: 0; } }
-@keyframes rew-f3 { 0%, 44% { opacity: 0; } 45%, 100% { opacity: 1; } }
+/* 네 프레임(11 → 4 → 3 → 2)을 6초에 되짚는다. 장면 11 이 늘면서 셋에서 넷이 됐다.
+ * 앞 두 장(실패 결과)은 이미 본 것이라 짧게 스치고, 세탁이 진행되던 3·2 에 시간을
+ * 준다 — 되돌아가는 지점이 어디인지가 이 연출이 말해야 하는 것이다. */
+@keyframes rew-f1 { 0%, 12% { opacity: 1; } 13%, 100% { opacity: 0; } }
+@keyframes rew-f2 { 0%, 12% { opacity: 0; } 13%, 28% { opacity: 1; } 29%, 100% { opacity: 0; } }
+@keyframes rew-f3 { 0%, 28% { opacity: 0; } 29%, 52% { opacity: 1; } 53%, 100% { opacity: 0; } }
+@keyframes rew-f4 { 0%, 52% { opacity: 0; } 53%, 100% { opacity: 1; } }
 .rew-f1 { animation: rew-f1 6s steps(1, end) both; }
 .rew-f2 { animation: rew-f2 6s steps(1, end) both; }
 .rew-f3 { animation: rew-f3 6s steps(1, end) both; }
+.rew-f4 { animation: rew-f4 6s steps(1, end) both; }
 
 @keyframes rew-scan {
   0%   { opacity: .55; transform: translateY(0); }
@@ -722,9 +761,37 @@ html[data-state="ended"] #scene-layer { pointer-events: none; }
   66%  { translate: 1px 2px; rotate: .8deg; }
   100% { translate: -1px 0; rotate: -.3deg; }
 }
-.sc1 .cam .s1-hold { transform-box: fill-box; transform-origin: 50% 8%; }   /* 손에 닿는 윗변 */
+.sc1 .cam .s1-hold { transform-box: fill-box; transform-origin: 50% 8%; }   /* 천이 걸린 윗변 */
 .sc1 .cam .s1-hold-l { animation: s1-sway-l var(--scene-dur, 4s) ease-in-out both; }
 .sc1 .cam .s1-hold-d { animation: s1-sway-d var(--scene-dur, 4s) ease-in-out both; }
+
+/* 11. 못 입게 됨(3.8초) — 장면 1 과 같은 그림, 반대 감정.
+ *
+ * 장면 1 의 흔들림(s1-sway)은 "무엇을 같이 돌릴까" 하는 망설임이라 두 벌이 서로
+ * 번갈아 움직였다. 여기서는 고를 것이 없다. 밝은 옷만 한 방향으로 처지고 짙은 옷은
+ * 거의 가만히 있다 — 손해가 한쪽에만 났다는 것을 움직임이 말한다.
+ *
+ * 카메라는 밝은 옷(760,1180)으로 밀어 들어간다. 규칙은 위 .cam 주석의 식 그대로
+ * translate(c(1-s)) scale(s) 이고, s=1.12 이면 translate(-91.2, -141.6) 이다.
+ * 3.8초 내내 등속에 가깝게 가서 말이 끝난 뒤에도 화면이 계속 움직인다. */
+@keyframes cam-push11 {
+  0%   { transform: translate(0px, 0px) scale(1); animation-timing-function: cubic-bezier(.25, 0, .5, .8); }
+  50%  { transform: translate(-52px, -80.7px) scale(1.068); animation-timing-function: linear; }
+  100% { transform: translate(-91.2px, -141.6px) scale(1.12); }
+}
+.sc11 .cam { animation: cam-push11 var(--scene-dur, 3.8s) both; }
+
+@keyframes s11-sag-l {
+  0%   { translate: 0 0; rotate: 0deg; }
+  100% { translate: 3px 16px; rotate: -1.4deg; }
+}
+@keyframes s11-sag-d {
+  0%   { translate: 0 0; rotate: 0deg; }
+  100% { translate: -1px 4px; rotate: .3deg; }
+}
+.sc11 .cam .s11-hold { transform-box: fill-box; transform-origin: 50% 8%; }
+.sc11 .cam .s11-hold-l { animation: s11-sag-l var(--scene-dur, 3.8s) cubic-bezier(.3, 0, .5, 1) both; }
+.sc11 .cam .s11-hold-d { animation: s11-sag-d var(--scene-dur, 3.8s) cubic-bezier(.3, 0, .5, 1) both; }
 
 /* 2. 장면 2 — 자막이 "그대로 세탁 시작"인데 아무것도 시작하지 않았다.
  *
@@ -776,24 +843,33 @@ html[data-state="ended"] #scene-layer { pointer-events: none; }
  * 아니라 카메라가 흔들린 것으로 읽히고, 그건 이 장면이 말하려는 것이 아니다.
  * 폭은 1080 기준 ±2.5px — 휴대폰에서 겨우 느껴지는 정도다. 이보다 키우면
  * 세탁기가 고장 난 화면이 되어 "실패 원인은 시트 미사용 하나"라는 전제가 흐려진다. */
+/* 카메라도 드럼과 같은 세 구간을 쓴다. 예전에는 50% 에 이미 1.10 까지 조여 놓고
+ * 남은 3초 동안 1.12 로만 갔다 — 드럼·진동과 함께 뒤쪽이 통째로 멎던 이유의 하나다.
+ * 값은 회전 진행률에 그대로 비례시켰다(22% → 150/1150 = .130 · 78% → 1000/1150 = .870).
+ * 그래서 "드럼이 가장 빠를 때 화면이 가장 빠르게 조여진다"는 원래 규칙은 그대로다. */
 @keyframes cam-push3 {
-  0%   { transform: translate(0px, 0px) scale(1); animation-timing-function: cubic-bezier(.4, 0, .5, 1); }
-  50%  { transform: translate(-27px, -50px) scale(1.10); animation-timing-function: cubic-bezier(.5, 0, .6, 1); }
+  0%   { transform: translate(0px, 0px) scale(1); animation-timing-function: cubic-bezier(.33, 0, .67, .265); }
+  22%  { transform: translate(-4.2px, -7.8px) scale(1.016); animation-timing-function: linear; }
+  78%  { transform: translate(-27.8px, -52.2px) scale(1.104); animation-timing-function: cubic-bezier(.33, .735, .67, 1); }
   100% { transform: translate(-32px, -60px) scale(1.12); }
 }
 .sc3 .cam { animation: cam-push3 var(--scene-dur, 6s) both; }
 
+/* 진동도 새 속도 곡선을 따라간다. 예전에는 52% 에서 정점을 찍고 88% 에 이미 0 이라,
+ * 드럼이 아직 도는 뒤쪽이 조용했다. 이제 최고 속도 구간(22~78%) 내내 세게 떨고
+ * 그 바깥에서만 잦아든다. 폭은 ±2.5px 그대로다 — 이보다 키우면 세탁기가 고장 난
+ * 화면이 되어 "실패 원인은 시트 미사용 하나"라는 전제가 흐려진다. */
 @keyframes s3-shudder {
   0%, 100% { translate: 0 0; }
-  20%  { translate: .6px -.5px; }
-  30%  { translate: -1.4px .9px; }
-  40%  { translate: 1.9px 1.2px; }
-  46%  { translate: -2.3px -1.4px; }
+  10%  { translate: .5px -.4px; }
+  22%  { translate: -1.5px 1.0px; }
+  32%  { translate: 2.1px 1.3px; }
+  42%  { translate: -2.5px -1.5px; }
   52%  { translate: 2.5px .8px; }
-  58%  { translate: -2.1px 1.5px; }
-  66%  { translate: 1.6px -1.1px; }
-  76%  { translate: -.9px .6px; }
-  88%  { translate: .4px -.3px; }
+  62%  { translate: -2.4px 1.5px; }
+  72%  { translate: 2.2px -1.2px; }
+  82%  { translate: -1.3px .8px; }
+  92%  { translate: .5px -.4px; }
 }
 .sc3 .cam .drum-body {
   transform-box: fill-box;
@@ -812,20 +888,52 @@ html[data-state="ended"] #scene-layer { pointer-events: none; }
  *      자책이 아니라 확인이다.
  *
  * 장면 4 는 watch·intervene 이 함께 보는 마지막 장면이고 이 광고의 전환점이다. */
+/* 뒤 3초(60~100%)가 3px·14px 표류뿐이라 사실상 정지였다. 내려오는 폭을 14px →
+ * 32px 로 키우고 기울기도 같이 준다 — 확인이 끝난 뒤 팔에서 힘이 빠지는 동작이
+ * 장면 끝까지 이어진다. 이 값이 상한이다: 옷과 손은 한 덩어리로 내려오는데 팔은
+ * 가만히 있으므로(holdCloseup 주석), 팔 끝의 둥근 마구리(반지름 75px)보다 더
+ * 내려가면 손이 팔에서 떨어져 보인다. */
+/* 손을 걷어내면서 다시 짰다. 예전에는 "눈앞으로 당겼다가(24%) 힘이 빠져
+ * 내려온다(60%~)" 였는데, 당기는 동작은 **팔이 있어야 성립한다** — 잡은 것이
+ * 없으면 옷이 저 혼자 위로 튀어 오른다.
+ *
+ * 지금은 당기지 않는다. 걸린 천이 제 무게로 계속 가라앉고 아주 조금 돈다.
+ * 위로 가는 구간이 없어서 손이 없어도 물리가 맞고, "힘이 빠진다"는 감정은
+ * 오히려 더 또렷하다. 얼룩이 진해지는 것(s4-stain-set)과 카메라가 계속
+ * 들어오는 것(cam-push4)이 같이 간다. */
 @keyframes s4-garment-check {
-  0%, 14%  { translate: 0 0; rotate: 0deg; }
-  24%      { translate: -14px -40px; rotate: -.7deg; }  /* 눈앞으로 당긴다 */
-  38%      { translate: -4px -14px; rotate: .3deg; }
-  60%      { translate: 5px 20px; rotate: -.2deg; }     /* 힘이 빠져 내려온다 */
-  100%     { translate: 8px 34px; rotate: -.4deg; }
+  0%    { translate: 0 -6px; rotate: .25deg; }
+  38%   { translate: 3px 14px; rotate: -.3deg; }
+  100%  { translate: 9px 54px; rotate: -1.2deg; }
 }
 .sc4 .cam .hold-garment {
   transform-box: fill-box;
-  transform-origin: 50% 0%;            /* 손에 잡힌 윗변 */
+  transform-origin: 50% 0%;            /* 천이 걸린 윗변 */
   animation: s4-garment-check var(--scene-dur, 8s) cubic-bezier(.35, 0, .3, 1) both;
 }
 /* 고개 젓기(s4-head-deny)는 걷어냈다 — 장면 4 가 클로즈업이 되면서 얼굴이 프레임
  * 밖으로 나갔다. 그 자리의 감정은 이제 옷이 처지는 것(s4-garment-check)이 맡는다. */
+
+/* 뒤 3초에 볼 것을 하나 더 준다 — 얼룩이 계속 번진다.
+ *
+ * 카메라와 옷의 움직임을 되살려도 그 3초 동안 **화면 한가운데의 얼룩 자체는**
+ * 아무 일도 안 한다. 젖은 천에서 색이 잡히는 것은 실제로 시간이 걸리는 일이고,
+ * 이 장면의 자막이 "셔츠 색이 변해 버렸다"이므로 변하는 중인 편이 말과도 맞는다.
+ *
+ * 시작을 .88 로 두어 장면이 진행되며 진해진다 — 하드 컷으로 들어오는 첫 프레임의
+ * 차이는 눈에 안 띄는 폭이다. 장면 8·9 의 옷도 같은 클래스를 갖지만 여기서만 걸린다.
+ *
+ * **넓히지는 말 것.** 얼룩 그룹에 scale 을 걸어 봤더니 같은 그룹에 걸린 clip-path 가
+ * 함께 커져서 옷 윤곽과 어긋났다 — 어깨에 깨끗한 띠가 드러나고 소매 밖으로 분홍이
+ * 삐져나왔다. 클립이 얼룩을 옷 안에 가두는 것은 **그룹이 안 움직일 때만** 참이다.
+ * 그래서 위치·크기는 건드리지 않고 농도만 올린다. */
+@keyframes s4-stain-set {
+  0%, 40% { opacity: .88; }
+  100%    { opacity: 1; }
+}
+.sc4 .cam .stain-set {
+  animation: s4-stain-set var(--scene-dur, 7.4s) cubic-bezier(.4, 0, .5, 1) both;
+}
 
 /* 8. 장면 8(개선 결과) — 장면 4 와 짝을 이루는 움직임.
  *
@@ -847,16 +955,20 @@ html[data-state="ended"] #scene-layer { pointer-events: none; }
 }
 .sc8 .cam { animation: cam-settle8 var(--scene-dur, 3.25s) both; }
 
+/* 여기도 "눈높이로 올린다"가 아니라 **떠오른다**로 바꿨다. 올리는 주체가 없으니
+ * 천이 가벼워져 스스로 뜨는 것으로 읽혀야 한다 — 장면 4 가 가라앉는 것과 짝이 된다.
+ * 폭은 장면 4 보다 작게 둔다. 장면 8 은 개입 조건만 보는 구간이라 여기가 더
+ * 극적이면 노출 시간 비대칭 위에 각성 비대칭이 얹힌다(motion.test.js 규칙 D). */
 @keyframes s8-garment-lift {
-  0%, 12% { translate: 0 10px; rotate: -.3deg; }
-  46%     { translate: 0 -22px; rotate: .35deg; }   /* 눈높이로 올려 색을 확인한다 */
-  100%    { translate: 0 -14px; rotate: .15deg; }
+  0%   { translate: 0 12px; rotate: -.3deg; }
+  55%  { translate: 0 -10px; rotate: .3deg; }
+  100% { translate: 0 -16px; rotate: .1deg; }
 }
 /* 장면 4 와 같은 이유로 transform 이 아니라 translate/rotate 개별 속성을 쓴다 —
  * .hold-garment 안쪽에 이미 속성 transform 이 걸려 있어 덮어쓰면 옷이 원점으로 튄다. */
 .sc8 .cam .hold-garment {
   transform-box: fill-box;
-  transform-origin: 50% 0%;            /* 손에 잡힌 윗변 */
+  transform-origin: 50% 0%;            /* 천이 걸린 윗변 */
   animation: s8-garment-lift var(--scene-dur, 3.25s) cubic-bezier(.3, 0, .25, 1) both;
 }
 

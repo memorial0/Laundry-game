@@ -61,7 +61,7 @@ module.exports = async function () {
   t.section('watch — 수정 행동 장면이 없다');
   const w2 = bootPage('?mode=watch&sid=s6-watch');
   await wait(150);
-  t.ok(w2.AD_ENGINE.list.map(s => s.no).join(',') === '1,2,3,4,10',
+  t.ok(w2.AD_ENGINE.list.map(s => s.no).join(',') === '1,2,3,4,11,10',
     'watch 재생 목록 = 실패까지 + 제품 메시지', w2.AD_ENGINE.list.map(s => s.no).join(','));
   t.ok(w2.AD_ENGINE.gotoNo(6) === false, '장면 6으로 이동할 수 없다');
   t.ok(w2.AD_RESULT.INT_DONE === null && w2.AD_RESULT.DWELL_INT === null,

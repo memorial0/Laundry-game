@@ -3,7 +3,7 @@
 const { JSDOM } = require('jsdom');
 const { bootArt, suite } = require('./lib/harness');
 
-const SCENES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const SCENES = [1, 2, 3, 4, 11, 5, 6, 7, 8, 9, 10];
 const parser = new (new JSDOM().window.DOMParser)();
 
 function parseError(svg) {

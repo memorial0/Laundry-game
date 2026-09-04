@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const { APP_DIR, bootPage, bootArt, wait, suite } = require('./lib/harness');
 
-const SCENES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const SCENES = [1, 2, 3, 4, 11, 5, 6, 7, 8, 9, 10];   // 재생 순서 (11 은 4 뒤)
 const OTHER = SCENES.filter(n => n !== 6);
 const countTags = s => (s.match(/</g) || []).length;
 
@@ -33,12 +33,12 @@ module.exports = async function () {
     const i = bootPage('?mode=intervene&ver=A');
     await wait(120);
     const noOf = win => win.AD_ENGINE.list.map(s => s.no);
-    t.ok(noOf(w).join(',') === '1,2,3,4,10', 'watch = 실패까지 + 제품 메시지', noOf(w).join(','));
-    t.ok(noOf(i).join(',') === '1,2,3,4,5,6,7,8,9,10', 'intervene = 전 장면', noOf(i).join(','));
+    t.ok(noOf(w).join(',') === '1,2,3,4,11,10', 'watch = 실패까지 + 제품 메시지', noOf(w).join(','));
+    t.ok(noOf(i).join(',') === '1,2,3,4,11,5,6,7,8,9,10', 'intervene = 전 장면', noOf(i).join(','));
 
     // 두 조건이 공유하는 장면은 그림·자막·길이가 한 글자도 다르면 안 된다
     const COMMON = noOf(w).filter(n => noOf(i).indexOf(n) >= 0);
-    t.ok(COMMON.join(',') === '1,2,3,4,10', '공통 장면 = 1,2,3,4,10', COMMON.join(','));
+    t.ok(COMMON.join(',') === '1,2,3,4,11,10', '공통 장면 = 1,2,3,4,11,10', COMMON.join(','));
     const at = (win, no) => {
       win.AD_ENGINE.pause();
       t.ok(win.AD_ENGINE.gotoNo(no), `장면 ${no} 이동`);
@@ -111,14 +111,30 @@ module.exports = async function () {
     t.ok(rel < 0.2, `장면 ${n} 요소 수 유사`, `${ca} vs ${cb}`);
   }
 
-  t.section('장면 4·8·9는 같은 함수 · stained만 다름');
-  const clean = a.holdFigure({ mood: 'worried' });
-  const stained = a.holdFigure({ mood: 'worried', stained: true });
+  /* 장면 4(실패 결과)와 8(개선 결과)은 같은 클로즈업이고 stained 값 하나만 다르다.
+   *
+   * 예전에는 이 검사가 `holdFigure` 를 불렀는데 **그 함수는 어느 장면도 쓰지
+   * 않는 죽은 코드였다** — 장면 4·8 이 클로즈업(holdCloseup)으로 바뀔 때 옛 전신
+   * 구도 함수가 남아 있었고, 검사만 그걸 붙들고 있었다. 실제로 렌더되는 장면을
+   * 부르도록 바꿨다(그리고 holdFigure·holdFrame·person 은 지웠다).
+   *
+   * 판정 방법도 같이 바꿔야 했다. 옛 구도에서는 얼룩이 마크업 **맨 끝**에 붙어서
+   * 마지막 </g> 를 기준으로 앞뒤를 비교하면 됐다. 지금은 얼룩이 의류 그룹 안에
+   * 들어가고 그 뒤에 손이 더 붙으므로 끝이 아니다. 그래서 "한 덩어리가 끼워
+   * 넣어졌는가"로 판정한다 — 공통 앞부분과 공통 뒷부분의 길이를 더해 깨끗한
+   * 쪽 전체를 덮으면, 두 그림은 연속된 한 조각(=얼룩)만 다르다. */
+  t.section('장면 4·8은 같은 클로즈업 · stained만 다름');
+  const clean = a.s8({ still: true });
+  const stained = a.s4({ still: true });
   t.ok(clean !== stained, 'stained 값이 그림을 바꾼다');
-  // 얼룩은 의류 그룹 마지막에만 덧붙는다 = 그 외 마크업은 한 글자도 다르지 않다
-  const cut = clean.lastIndexOf('</g>');
-  t.ok(stained.startsWith(clean.slice(0, cut)) && stained.endsWith(clean.slice(cut)),
-    '얼룩 레이어 외에는 완전히 동일(인물·의류·구도)');
+  let pre = 0;
+  while (pre < clean.length && clean[pre] === stained[pre]) pre++;
+  let suf = 0;
+  while (suf < clean.length - pre &&
+         clean[clean.length - 1 - suf] === stained[stained.length - 1 - suf]) suf++;
+  t.ok(stained.length > clean.length && pre + suf >= clean.length,
+    '얼룩 레이어 외에는 완전히 동일(구도·의류·손)',
+    { 공통앞: pre, 공통뒤: suf, 깨끗한쪽길이: clean.length });
 
   t.section('표현 제한 · 오프라인');
   const js = fs.readFileSync(path.join(APP_DIR, 'scenes.js'), 'utf8');
