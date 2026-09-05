@@ -1,6 +1,8 @@
 /* 장면 엔진 — 1→10 자동 진행, 자막, 장면별 렌더, ?still */
 'use strict';
-const { bootPage, wait, suite } = require('./lib/harness');
+const fs = require('fs');
+const path = require('path');
+const { bootPage, wait, suite, APP_DIR } = require('./lib/harness');
 
 const EXPECTED = {
   A: {
@@ -71,6 +73,41 @@ module.exports = async function () {
     t.ok(durs.join(',') === table, mode + ' 장면 길이표', durs.join(','));
     const total = durs.reduce((a, b) => a + (b || 0), 0);
     t.ok(total >= lo && total <= hi, `${mode} 고정 길이 ${lo}~${hi}초`, total);
+  }
+
+  /* SPEC 3장의 장면표와 대조한다.
+   *
+   * 그 표는 손으로 적은 길이 열을 갖고 있고 **아무것도 안 보고 있었다.** 두 자극의
+   * 노출 시간을 맞추며 DUR 을 줄였을 때(28.0 → 25.4초) 표만 옛 값으로 남아, 같은
+   * 파일 안에서 바로 위 산문("watch 25.4초 고정")과 표(합 28.0초)가 서로 다른 말을
+   * 하고 있었다. SPEC 은 구현 지시의 기준 문서이고 IRB 별첨 스토리보드와 짝이라,
+   * 어느 쪽을 믿어야 하는지가 갈리면 안 된다.
+   *
+   * 값은 실행 중인 엔진에서 읽는다 — 여기에 옮겨 적으면 표가 둘이 되고 같은 일이
+   * 한 번 더 일어난다(voice.test.js 의 DUR 주석과 같은 이유다). */
+  {
+    const spec = fs.readFileSync(path.join(APP_DIR, '..', 'SPEC.md'), 'utf8');
+    const w = bootPage('?mode=intervene');
+    await wait(120);
+    const DUR = {};
+    for (const sc of w.AD_ENGINE.list) if (sc.dur) DUR[sc.no] = sc.dur;
+
+    const rows = [];
+    for (const line of spec.split('\n')) {
+      const m = /^\| (\d+) \| /.exec(line);
+      if (!m) continue;
+      const cells = line.split('|');
+      const cell = cells[cells.length - 3].trim();      // 길이 열
+      const n = /^(\d+(?:\.\d+)?)s/.exec(cell);
+      if (n) rows.push([Number(m[1]), Number(n[1])]);   // 5·6 은 "가변…" 이라 안 걸린다
+    }
+    t.ok(rows.length === Object.keys(DUR).length,
+      `SPEC 장면표에서 길이 ${Object.keys(DUR).length}개를 읽었다`, rows.length);
+
+    const off = rows.filter(([no, sec]) => DUR[no] === undefined ||
+      Math.abs(DUR[no] - sec) > 0.005)
+      .map(([no, sec]) => `장면 ${no}: SPEC ${sec}s ≠ 코드 ${DUR[no]}s`);
+    t.ok(off.length === 0, 'SPEC 3장 장면표의 길이가 코드와 같다', off.length ? off : undefined);
   }
 
   t.section('일시정지 · ?still');
