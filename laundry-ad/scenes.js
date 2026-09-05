@@ -1047,7 +1047,28 @@
       ART.lightGarment({ x: x, y: y, s: S, stained: !!o.stained }) +
       '</g>';
   };
-  // 5. 되감기 — 장면 4→3→2 역방향 후 세탁 시작 직전에 정지
+  /* 5. 되감기 — 장면 11→4→3→2 를 역방향으로 되짚고 세탁 시작 직전에 멎는다.
+   *
+   * 예전에는 정지 화면 네 장이 옅은 파란 색보정 아래에서 차례로 바뀌는 것이
+   * 전부였다. "되감는 중"이라고 말하는 것은 왼쪽 위 배지 하나뿐이었고 화면
+   * 자체는 슬라이드쇼라, **되돌아가는 느낌이 안 난다**는 지적이 나왔다.
+   * 게임 자극 쪽은 같은 자리에서 기록을 실제로 거꾸로 되돌리므로(history.pop)
+   * 화면이 진짜로 뒤로 간다 — 두 자극 중 세탁만 정지 화면이었다.
+   *
+   * 테이프 되감기의 문법을 넣었다. 다섯 가지이고 전부 `.is-rewinding` 이 붙은
+   * 재생 중에만 돈다 — 스토리보드(?still=5)는 예전 그대로 깨끗한 착지 화면이다.
+   *
+   *   rew-shake  그림이 틀 안에서 튄다. 셔틀의 서명이고 가장 크게 일한다
+   *   rew-tear   밝은 트래킹 바가 아래에서 위로 훑는다 (위로 = 뒤로)
+   *   rew-snow   치지지직 — 흩뿌린 잡음 조각 네 벌이 번갈아 켜진다
+   *   rew-cut    컷이 바뀌는 순간의 섬광. 착지에서 가장 세다
+   *   rew-bar    위쪽 표시줄의 마커가 오른쪽에서 왼쪽으로 되돌아간다
+   *
+   * **착지(48% · 2.88초)에서 다섯이 한꺼번에 멎는 것이 연출의 절반이다.**
+   * 계속 흔들리면 되돌아간 지점이 어디인지가 안 보인다. 남은 3.1초는 세탁
+   * 시작 직전의 조용한 화면이고, 자막의 질문이 거기서 읽힌다. 예전에는 이
+   * 3초가 아무 처리도 없는 정지 화면이었다(스캔라인·배지 애니메이션이 4.5초에
+   * 끝나 버려서, 되감기 화면의 마지막 절반은 그냥 그림 한 장이었다). */
   ART.s5 = function (o) {
     o = o || {};
     var scan = '<g class="rew-scan" opacity=".5">';
@@ -1055,22 +1076,77 @@
       scan += '<rect x="0" y="' + y + '" width="1080" height="8" fill="#0B1830" opacity=".16"/>';
     }
     scan += '</g>';
-    // 되감기 색보정 + 비네트
+    // 되감기 색보정 + 비네트. 착지 화면에도 남는 밑색이다
     var grade =
       '<rect x="0" y="0" width="1080" height="1920" fill="#2A3E6B" opacity=".16"/>' +
       '<rect x="0" y="0" width="1080" height="1920" fill="none" stroke="#0B1830" stroke-width="220" opacity=".18"/>';
+    /* 셔틀 동안만 얹히는 찬 색. 착지에서 이게 빠지면서 화면이 "테이프 밖으로"
+     * 나온다 — 되감기가 끝났다는 신호를 색으로도 준다. */
+    var gradeHot =
+      '<rect x="0" y="0" width="1080" height="1920" fill="#16305E" opacity=".26"/>';
+
+    /* 치지지직 — 잡음 조각. 네 벌을 번갈아 켜서 자글거리게 만든다.
+     * 자리는 seed 로 고정한다: 참가자마다 다른 화면이 나오면 안 된다. */
+    var seed = 20260905;
+    function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
+    var snow = '<g class="rew-snow">';
+    for (var g = 0; g < 4; g++) {
+      snow += '<g>';
+      for (var i = 0; i < 44; i++) {
+        var sw = 14 + rnd() * 104;
+        snow += '<rect x="' + Math.round(rnd() * (1080 - sw)) +
+          '" y="' + Math.round(rnd() * 1912) +
+          '" width="' + Math.round(sw) +
+          '" height="' + (2 + Math.round(rnd() * 5)) +
+          '" fill="' + (rnd() < 0.42 ? '#08101F' : '#F2F7FF') +
+          '" opacity="' + (0.28 + rnd() * 0.5).toFixed(2) + '"/>';
+      }
+      snow += '</g>';
+    }
+    snow += '</g>';
+
+    /* 트래킹 바 — 가장자리를 흘려 띠가 아니라 빛으로 읽히게 한다.
+     * 그라디언트는 여기서만 쓰므로 공용 defs 에 넣지 않는다. */
+    var tear =
+      '<defs><linearGradient id="g-rewtear" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0" stop-color="#DCE8FF" stop-opacity="0"/>' +
+      '<stop offset="0.42" stop-color="#EAF1FF" stop-opacity="0.30"/>' +
+      '<stop offset="0.58" stop-color="#EAF1FF" stop-opacity="0.30"/>' +
+      '<stop offset="1" stop-color="#DCE8FF" stop-opacity="0"/>' +
+      '</linearGradient></defs>' +
+      '<g class="rew-tear">' +
+      '<rect x="0" y="0" width="1080" height="228" fill="url(#g-rewtear)"/>' +
+      '<rect x="0" y="104" width="1080" height="5" fill="#F6F9FF" opacity=".5"/>' +
+      '<rect x="0" y="132" width="1080" height="2" fill="#F6F9FF" opacity=".34"/>' +
+      '</g>';
+
+    var cut = '<rect class="rew-cut" x="0" y="0" width="1080" height="1920" fill="#E8F0FF"/>';
+
     var badge =
       '<g class="rew-badge">' +
-      '<rect x="60" y="120" width="316" height="100" rx="26" fill="#101725" opacity=".82"/>' +
+      '<rect x="60" y="120" width="316" height="100" rx="26" fill="#0A101C" opacity=".92"/>' +
       ART.text(218, 190, 52, '◀◀ 되감기', { fill: '#fff', weight: 700 }) +
       '</g>';
+    /* 되돌아가는 방향을 화면에 그린다 — 마커가 오른쪽에서 왼쪽으로 간다.
+     * 배지와 한 줄을 이뤄 비디오 표시줄로 읽히고, 착지에서 그 자리에 선다.
+     * 셔틀이 멎은 뒤에도 남는 유일한 연출이라 "여기까지 돌아왔다"를 말한다. */
+    var bar =
+      '<g class="rew-bar">' +
+      '<rect x="404" y="157" width="616" height="26" rx="13" fill="#0A101C" opacity=".72"/>' +
+      '<rect class="rew-head" x="962" y="161" width="50" height="18" rx="9" fill="#EEF4FF" opacity=".95"/>' +
+      '</g>';
+
     /* 첫 프레임이 장면 11 이다 — 되감기 직전에 화면에 있던 것이 그것이라,
      * 장면 4 부터 시작하면 역재생이 앞으로 한 번 튀고 시작한다. */
-    return '<g class="rew-f rew-f1">' + ART.s11({ still: true }) + '</g>' +
+    return '<g class="rew-shake">' +
+      '<g class="rew-f rew-f1">' + ART.s11({ still: true }) + '</g>' +
       '<g class="rew-f rew-f2">' + ART.s4({ still: true }) + '</g>' +
       '<g class="rew-f rew-f3">' + ART.s3({ still: true }) + '</g>' +
       '<g class="rew-f rew-f4">' + ART.s2({ still: true }) + '</g>' +
-      grade + scan + badge;
+      '</g>' +
+      grade +
+      '<g class="rew-fx">' + gradeHot + tear + snow + scan + '</g>' +
+      cut + badge + bar;
   };
 
   // 손가락 아이콘 (intervene 힌트용 — 인물이 아니라 UI 안내임을 드러내는 흰 아이콘)
