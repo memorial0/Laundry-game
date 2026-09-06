@@ -63,6 +63,22 @@ const PRODUCT_CARD_SEC = 8;
 const CANVAS_W = 480;
 const CANVAS_H = 853;
 
+/* COLLISION! · ◀◀ REWIND 배너를 화면 한가운데에서 이만큼 올려 그린다.
+ *
+ * 왜 필요한가 — [되돌리기] 프롬프트가 세탁 자극과 같은 자리로 올라오면서
+ * (.rewind-prompt { bottom: 25cqh }) 그 띠가 캔버스 y 482~640 을 차지한다.
+ * 배너의 옛 자리는 y 507 로 **그 띠 한복판**이라, "COLLISION!" 과
+ * "지금 이 선택을 되돌린다면?" 이 같은 줄에 겹쳐 찍혀 둘 다 못 읽혔다.
+ * 프롬프트는 못 내린다 — 세탁 쪽은 그 자리가 자막 띠에 가려서 올린 것이고,
+ * 두 자극의 이 버튼은 같은 자리에 있어야 T_REWIND 가 비교된다(laundry-ad/style.css).
+ * 그래서 내려오는 쪽이 아니라 **배너가 올라간다**: 110px 올리면 y 397 로
+ * 프롬프트 위쪽 공간(0~482)의 한가운데에 오고, 아래로 77px 이 빈다.
+ *
+ * 결과 문구(FAILURE·성공)는 안 건드린다. 그쪽은 endStimulus 에서만 뜨고 그때는
+ * 단계가 이미 ended 로 넘어가 배너도 프롬프트도 없다 — 겹칠 일이 없다.
+ * 프롬프트 위치(25cqh)를 만지면 이 값을 다시 잴 것. */
+const BANNER_LIFT = 110;
+
 /* 로직 틱 — 타임라인의 t 단위가 곧 이 틱이다. 60틱 = 1초.
  * 화면 주사율이 얼마든 1초에 TICK_HZ 번만 돈다. */
 const TICK_HZ = 60;
@@ -1126,7 +1142,7 @@ const MicrogateExperiment = () => {
 
     if (gamePhase === 'rewind_watch' || gamePhase === 'rewind_back') {
       ctx.fillStyle = SEA.ink; ctx.font = 'bold 40px monospace'; ctx.textAlign = 'center'; ctx.shadowColor = 'rgba(255, 92, 122, 0.8)'; ctx.shadowBlur = 20;
-      ctx.fillText(gamePhase === 'rewind_watch' ? 'COLLISION!' : '◀◀ REWIND', width / 2, height / 2 + 80);
+      ctx.fillText(gamePhase === 'rewind_watch' ? 'COLLISION!' : '◀◀ REWIND', width / 2, height / 2 - BANNER_LIFT + 80);
       ctx.shadowBlur = 0;
     }
     if (gamePhase === 'ended') { ctx.fillStyle = gameResult === 'success' ? 'rgba(4, 42, 54, 0.15)' : 'rgba(0, 6, 14, 0.45)'; ctx.fillRect(0, 0, width, height); }

@@ -210,9 +210,24 @@ module.exports = async function () {
     };
     const cta = animOf(pick('.cta'));
     const close = animOf(pick('.ad-close'));
-    t.ok(cta === close,
-      '[구매하기]와 [×]가 같은 방식으로 등장한다',
-      { CTA: cta || '없음', 닫기: close || '없음' });
+
+    /* 2026-09-04: [×] 만 늦게 나오게 했다(1.5초). 실제 광고가 닫기를 미루는 문법이고
+     * 사용자가 요청한 것이다. 그래서 "둘이 똑같이 등장한다"는 예전 검사는 더 못 쓴다.
+     *
+     * 대신 **두 자극의 [×] 가 같은 방식으로 늦는지**를 본다. 이게 실제로 지켜야 하는
+     * 규칙이다 — 한쪽 자극만 닫기를 미루면 그 차이가 CLOSE_CLICK · CTA_CLICK 비교에
+     * 그대로 들어온다. sfx.test.js 가 두 자극의 소리 코어를 대조하는 것과 같은 뜻이다.
+     *
+     * CTA 는 예전 그대로 둔다(세탁 400ms · 게임 연출 없음). 이번에 바꾼 것은 [×] 뿐이고,
+     * 그 변경이 두 자극에 똑같이 들어갔다는 것만 여기서 보장한다. */
+    const gameCss = fs.readFileSync(
+      path.join(APP_DIR, '../game/src/styles/main.css'), 'utf8');
+    const gameClose = (gameCss.match(/\.ad-close\s*\{[^}]*animation:\s*([^;]+);/) || [])[1];
+    t.ok(gameClose && close && gameClose.trim() === close.trim(),
+      '두 자극의 [×] 가 같은 방식·같은 지연으로 나온다',
+      { 세탁: close || '없음', 게임: (gameClose || '없음').trim() });
+    t.ok(/\bboth\b/.test(close || '') && /1500ms|--close-delay/.test(close || ''),
+      '[×] 는 지연 뒤에 나오고 그 전에는 상태가 유지된다 (fill-mode both)', close || '없음');
     t.ok(!/infinite/.test(cta || '') && !/infinite/.test(close || ''),
       '둘 다 맥동하지 않는다 (되돌리기와 달리 여기는 종속변인이다)');
 
