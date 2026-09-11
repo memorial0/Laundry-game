@@ -5,17 +5,14 @@ const path = require('path');
 const { bootPage, wait, suite, APP_DIR } = require('./lib/harness');
 
 const EXPECTED = {
+  /* 두 버전이 같은 자막을 낸다 — 소재(셔츠+청바지)가 같다. 예전 B 는 "수건" 이었다. */
   A: {
     1: '내일 입을 셔츠, 오늘 같이 빨래하기',
     4: '셔츠 색이 변해 버렸다',
     6: { watch: '시트를 세탁기 안으로 끌어다 놓기만 하면', intervene: '시트를 세탁기 안으로 끌어다 놓아 주세요' }
-  },
-  B: {
-    1: '내일 쓸 수건, 오늘 같이 빨래하기',
-    4: '수건 색이 변해 버렸다',
-    6: { watch: '시트를 세탁기 안으로 끌어다 놓기만 하면', intervene: '시트를 세탁기 안으로 끌어다 놓아 주세요' }
   }
 };
+EXPECTED.B = EXPECTED.A;
 
 module.exports = async function () {
   const t = suite('엔진 · 장면 진행');

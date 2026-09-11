@@ -18,9 +18,9 @@ const { bootPage, wait, suite, APP_DIR } = require('./lib/harness');
 
 /* scenes.js 의 voiceKey() 를 테스트에서 다시 적는다 — 같은 함수를 불러다 쓰면
  * 그 함수가 틀렸을 때 같이 틀린다. 규칙을 독립적으로 진술해 둔다.
- *   1·4 는 소재(ver)에 따라, 6 은 수행 주체(mode)에 따라 자막이 갈린다. */
+ *   6 만 수행 주체(mode)에 따라 자막이 갈린다. 1·4·11 은 소재를 통일하기 전까지
+ *   ver 로 갈렸다(s1A/s1B) — 지금은 두 버전이 같은 클립을 듣는다. */
 function keyFor(no, mode, ver) {
-  if (no === 1 || no === 4 || no === 11) return 's' + no + ver;
   if (no === 6) return 's6' + (mode === 'intervene' ? 'i' : 'w');
   return 's' + no;
 }
@@ -130,17 +130,17 @@ module.exports = async function () {
   const SHARED_SC = [1, 2, 3, 4, 11, 10];   // 11 은 watch·intervene 둘 다 본다
   const span = ks => Math.max(...ks.map(k => semi[k])) - Math.min(...ks.map(k => semi[k]));
 
-  t.ok(semi.s4A === Math.min(...have.map(k => semi[k])),
-    '실패(장면 4)가 가장 낮다', `${semi.s4A}반음`);
+  t.ok(semi.s4 === Math.min(...have.map(k => semi[k])),
+    '실패(장면 4)가 가장 낮다', `${semi.s4}반음`);
   t.ok(semi.s8 === Math.max(...have.map(k => semi[k])),
     '해소(장면 8)가 가장 높다', `${semi.s8}반음`);
-  t.ok(rate.s4A === Math.max(...have.map(k => rate[k])),
-    '실패가 가장 느리다', `${rate.s4A}배`);
+  t.ok(rate.s4 === Math.max(...have.map(k => rate[k])),
+    '실패가 가장 느리다', `${rate.s4}배`);
   /* 가장 빠른 것은 장면 2 다 — "그대로 세탁 시작"을 무심하게 흘리는 것이
    * 실패의 씨앗이라 일부러 그렇게 뒀다. 여기서 볼 것은 무거운 대사와 가벼운
    * 대사가 갈렸는가지 누가 1등인가가 아니다. */
-  t.ok(rate.s8 < rate.s4A, '해소가 실패보다 가볍고 빠르다',
-    `해소 ${rate.s8}배 · 실패 ${rate.s4A}배`);
+  t.ok(rate.s8 < rate.s4, '해소가 실패보다 가볍고 빠르다',
+    `해소 ${rate.s8}배 · 실패 ${rate.s4}배`);
 
   const shared = have.filter(k => SHARED_SC.includes(no(k)));
   const intOnly = have.filter(k => !SHARED_SC.includes(no(k)));
@@ -152,14 +152,15 @@ module.exports = async function () {
     '개입 전용 구간이 공통 구간보다 극적이지 않다',
     { 공통: +span(shared).toFixed(1), intervene전용: +span(intOnly).toFixed(1) });
 
-  /* ---- ver·mode 로 갈리는 짝은 같은 처리를 받는다 ---- */
+  /* ---- mode 로 갈리는 짝은 같은 처리를 받는다 ---- */
   /* piper 는 기본값에서 합성에 난수를 쓴다. 켜 두면 **같은 문장이 구울 때마다
    * 다른 억양으로 나오고**(실측 180.7 / 196.9 / 204.2Hz), 낱말 하나만 다른 짝은
-   * 억양까지 갈린다 — 첫 판에서 장면 4가 A 232Hz · B 182Hz 로 4반음 벌어져 있었다.
-   * 이 광고의 전환점 대사인데 버전마다 다른 무게로 들렸다는 뜻이다.
-   * 지금은 난수를 끄고(build-voice.py synth) 짝이 같은 값을 받는지 여기서 본다. */
-  t.section('ver·mode 로 갈리는 짝은 같은 처리');
-  for (const [a2, b2] of [['s1A', 's1B'], ['s4A', 's4B'], ['s6i', 's6w']]) {
+   * 억양까지 갈린다 — 소재가 갈렸던 시절 첫 판에서 장면 4가 A 232Hz · B 182Hz 로
+   * 4반음 벌어져 있었다. 이 광고의 전환점 대사인데 버전마다 다른 무게로 들렸다는
+   * 뜻이다. 지금은 난수를 끄고(build-voice.py synth) 짝이 같은 값을 받는지 여기서
+   * 본다. ver 짝은 없어졌고 s6i/s6w 만 남았다. */
+  t.section('mode 로 갈리는 짝은 같은 처리');
+  for (const [a2, b2] of [['s6i', 's6w']]) {
     t.ok(semi[a2] === semi[b2] && rate[a2] === rate[b2],
       `${a2} · ${b2} 가 같은 속도·높이로 읽힌다`,
       `${rate[a2]}배 ${semi[a2]}반음 vs ${rate[b2]}배 ${semi[b2]}반음`);
