@@ -139,7 +139,7 @@ function report(t, r) {
   t.ok(r.messages.indexOf('AD_DONE') >= 0, 'AD_DONE postMessage 발화', r.messages);
 }
 
-/** A/B는 소재만 다르다 — 같은 mode끼리 총 길이가 같아야 한다(SPEC 도구 8) */
+/** A/B는 색조만 다르다 — 같은 mode끼리 총 길이가 같아야 한다(SPEC 도구 8) */
 function reportParallel(t, results) {
   t.section('ver A = ver B (재생 시간)');
   for (const mode of ['watch', 'intervene']) {

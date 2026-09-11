@@ -18,20 +18,26 @@
 
   var BRAND = '클린가드'; // 가상 브랜드 (교체 가능)
 
-  // ver A/B는 "소재만" 다르다. 구조·길이·문구 구조 동일 (도구 8 평행 자극 요건)
+  /* 소재는 두 버전이 같다 — 밝은 셔츠 + 짙은 청바지 (2026-09-11 통일).
+   *
+   * 예전에는 A 가 셔츠+양말, B 가 수건+티셔츠였다(도구 8 평행 자극 — 같은 참가자가
+   * 두 번 보니 소재를 갈았다). 그 대가로 (a) 장면 1·4·11 의 자막·나래이션이 버전마다
+   * 달랐고(입을/쓸 · 였다/이었다) (b) 수건은 셔츠와 같은 드레이프를 줄 수 없어 버전 간
+   * 완성도가 갈렸고 (c) "밝은 옷을 지키는 시트"인데 한 버전은 옷이 아니라 수건이었다.
+   * 소재를 하나로 하면 두 번째 노출이 "아까 그 광고"로 읽히는 문제가 남는다 —
+   * INTEGRATION.md §5-19 에 감수한 것으로 적어 두었다.
+   *
+   * A·B 는 이제 배경 색조만 다르다(아래 PAL 의 ver B 분기). 문장은 셔츠 하나에 맞춰
+   * 있으므로 ver 로 갈리는 자막·클립이 없다(voiceKey 참고).
+   *
+   * used·was 는 장면 11 전용이다 — "내일 입을 셔츠"(장면 1)를 과거로 받는다. */
+  var MATERIAL = {
+    light: { name: '셔츠', use: '입을', used: '입으려던', was: '였다', shape: 'shirt' },
+    dark:  { name: '청바지', shape: 'jeans' }                        // 짙은색 이염원
+  };
   var VERSIONS = {
-    A: {
-      id: 'A',
-      /* used·was 는 장면 11 전용이다 — "내일 입을 셔츠"(장면 1)를 과거로 받는다.
-       * was 가 소재마다 다른 것은 받침 때문이다(셔츠였다 / 수건이었다). */
-      light: { name: '셔츠', josa_i: '가', use: '입을', used: '입으려던', was: '였다', shape: 'shirt' },
-      dark: { name: '양말', josa_i: '이', shape: 'socks' }                // 짙은색 이염원
-    },
-    B: {
-      id: 'B',
-      light: { name: '수건', josa_i: '이', use: '쓸', used: '쓰려던', was: '이었다', shape: 'towel' },
-      dark: { name: '티셔츠', josa_i: '가', shape: 'tee' }
-    }
+    A: { id: 'A', light: MATERIAL.light, dark: MATERIAL.dark },
+    B: { id: 'B', light: MATERIAL.light, dark: MATERIAL.dark }
   };
 
   var MODES = { WATCH: 'watch', INTERVENE: 'intervene' };
@@ -138,10 +144,10 @@
   var DUR = { 1: 3.6, 2: 2.4, 3: 4.4, 4: 3.4, 11: 3.6, 7: 3.0, 8: 2.4, 9: 2.75, 10: 8.0 };
 
   /* 장면 번호 → 클립 키. 자막이 갈리는 장면만 뒤에 판별자가 붙는다 —
-   * 1·4·11 은 소재(ver), 6 은 수행 주체(mode)에 따라 자막이 다르다.
+   * 6 은 수행 주체(mode)에 따라 자막이 다르다. 예전에는 1·4·11 도 소재(ver)로
+   * 갈렸는데(s1A/s1B…) 소재를 통일하면서 그 판별자는 없어졌다.
    * voice.test.js 가 이 표를 자막 함수와 직접 대조한다. */
   function voiceKey(no) {
-    if (no === 1 || no === 4 || no === 11) return 's' + no + CFG.ver;
     if (no === 6) return 's6' + (CFG.mode === MODES.INTERVENE ? 'i' : 'w');
     return 's' + no;
   }
@@ -210,15 +216,18 @@
    *             같이 있어야 한다. 흰 옷을 흰 옷으로 보이게 하는 것은 옷의 색이 아니라
    *             **뒤에 깔린 값**이다. 실사 광고가 흰 빨래 뒤를 어둡게 까는 이유다.
    *   채도      중간 채도 파스텔이 아동 삽화의 표식이다. 배경은 채도를 내리고,
-   *             채도는 **이염(붉은색)과 브랜드(청록)에만** 준다. 화면에서 색이 튀는
-   *             자리가 둘뿐이면 그 둘이 뜻을 갖는다.
-   *   이염 색   이 제품 범주(이염 방지 시트)의 대표 이미지는 **흰 빨래에 붉은 것
-   *             하나가 들어가 전부 물드는 것**이다. 예전에는 짙은 남색이 이염원이라
-   *             얼룩이 회보라(#8F9BC6)로 나왔고, 화면에서 더러움이 아니라 **그늘로
-   *             읽혔다.** 붉은색은 옷 위에서 분홍으로 번져 사고로 보인다.
+   *             채도는 **이염(청바지의 남색)과 브랜드(청록)에만** 준다. 화면에서 색이
+   *             튀는 자리가 둘뿐이면 그 둘이 뜻을 갖는다.
+   *   이염 색   이염원이 청바지라 염료는 인디고다 — 새 청바지가 흰 빨래를 물들이는
+   *             것이 이 범주에서 가장 흔한 실제 사고다. 한때 붉은색이었다(대표 이미지
+   *             "흰 빨래에 붉은 것 하나"). 그 전의 남색 시도가 실패한 것은 색상이
+   *             아니라 **채도**였다 — 얼룩이 회보라(#8F9BC6)로 나와 더러움이 아니라
+   *             그늘로 읽혔다. 지금 얼룩(stain)은 그보다 채도가 훨씬 높은 남색이라
+   *             옷 위에서 하늘색으로 번지고, 셔츠의 음영(회색)과 색상이 갈린다.
+   *             그늘로 읽히기 시작하면 채도를 더 올리되 회색 쪽으로 물러서지 말 것.
    *
    * 자막은 색을 지칭하지 않는다("셔츠 색이 변해 버렸다") — 이염원 색을 바꿔도
-   * 나래이션·자막은 그대로다. A·B 가 갈리는 것은 소재이지 색 규칙이 아니다. */
+   * 나래이션·자막은 그대로다. A·B 는 색조만 다르고 이 색 규칙은 공유한다. */
   var PAL = {
     // 세탁실 — 채도를 내리고 값을 벌렸다. base 는 걸레받이·선반의 가장 어두운 값이다
     wall: '#AEB9C4', wallLo: '#8B98A6', wallHi: '#CBD4DC',
@@ -228,11 +237,11 @@
     // 세탁기 — 흰 가전이되 테두리·투입구에 진짜 어두운 값이 있다
     body: '#F4F7FA', bodyLo: '#C3CCD6', panel: '#D9E1E9', edge: '#8A97A5',
     ring: '#788593', ringLo: '#525E6B', door: '#B0BCC8', glass: '#42525F', opening: '#0E1318',
-    // 물 · 염료 — 붉은 이염 (범주의 대표 이미지)
-    water: '#93A9BA', dye: '#A81B34', dyeLo: '#CF4A63', stain: '#C85E78',
-    // 의류
+    // 물 · 염료 — 인디고 이염 (청바지에서 빠진 물)
+    water: '#93A9BA', dye: '#1F3F8C', dyeLo: '#4C6DBE', stain: '#5B7FCB',
+    // 의류 — dark 는 청바지 데님. darkHi 는 물 빠진 자리·접힘의 밝은 값
     light: '#FFFFFF', lightEdge: '#AAB6C2', lightShade: '#DCE4EC',
-    dark: '#8C1C2C', darkEdge: '#61121E', darkHi: '#B03144',
+    dark: '#2E4676', darkEdge: '#1B2B4E', darkHi: '#4F6A9C',
     // 인물
     skin: '#D3A585', skinEdge: '#A87C59', hair: '#221C17', wear: '#47554F', wearLo: '#333F3A',
     // 제품 (가상 브랜드)
@@ -242,7 +251,7 @@
     ink: '#10151A', mute: '#56626D'
   };
 
-  // ver B: 소재 외에 인물 옷 색상·배경 색조만 다르다 (구도·길이·정보량 동일)
+  // ver B: 배경 색조·밝은 옷의 흰색 온도만 다르다 (소재·구도·길이·정보량 동일)
   if (CFG.ver === 'B') {
     PAL.wall = '#C0B7AC'; PAL.wallLo = '#9E9488'; PAL.wallHi = '#D8D1C8';
     // A 와 반대로 짠다 — A 는 차가운 벽 + 중성 바닥, B 는 따뜻한 벽 + 차가운 바닥.
@@ -497,7 +506,7 @@
       '</g>';
   };
 
-  /* 의류 — kind: shirt | tee | towel | socks. (x,y)=좌상단, 로컬 200x210 */
+  /* 의류 — kind: shirt | jeans. (x,y)=좌상단, 로컬 200x210 */
   var GARMENT_UID = 0;
 
   ART.garment = function (kind, o) {
@@ -514,7 +523,7 @@
      * 보였지만 카메라를 붙이자 얼룩이 인물의 몸통 위에 그려져 있었다. */
     var outline = '';
 
-    if (kind === 'shirt' || kind === 'tee') {
+    if (kind === 'shirt') {
       /* 예전 외곽선은 직선 여덟 개짜리였고 몸판이 **완전한 직사각형**이었다
        * (L54,200 L146,200 L146,64 — 옆선 수직 · 밑단 수평 · 모서리 직각).
        * 소매도 사각형이라, 7초 넘게 화면을 채우는 클로즈업에서 옷이 아니라
@@ -552,53 +561,61 @@
         '" stroke-width="6" stroke-linecap="round" opacity=".28"/>' +
         '<path d="M127,74 C130,112 130,154 128,192" fill="none" stroke="' + shade +
         '" stroke-width="5" stroke-linecap="round" opacity=".2"/>';
-      if (kind === 'shirt') {
-        body += '<path d="M70,14 L100,54 L130,14" fill="none" stroke="' + edge + '" stroke-width="5" stroke-linejoin="round"/>' +
-          '<path d="M62,10 L100,54 L86,60 Z M138,10 L100,54 L114,60 Z" fill="' + shade + '" opacity=".55" stroke="' + edge + '" stroke-width="3"/>' +
-          '<path d="M100,60 V194" stroke="' + edge + '" stroke-width="4"/>' +
-          '<circle cx="100" cy="92" r="5" fill="' + edge + '"/>' +
-          '<circle cx="100" cy="128" r="5" fill="' + edge + '"/>' +
-          '<circle cx="100" cy="164" r="5" fill="' + edge + '"/>';
-      } else {
-        body += '<path d="M70,16 q30,26 60,-2" fill="none" stroke="' + edge + '" stroke-width="7"/>' +
-          // 밑단 스티치도 새 밑단 호를 따라간다 (예전엔 h80 짜리 수평선이었다)
-          '<path d="M62,190 C76,197 88,200 100,200 C112,200 124,197 138,190"' +
-          ' fill="none" stroke="' + edge + '" stroke-width="4" opacity=".6"/>';
-      }
-    } else if (kind === 'towel') {
-      /* 수건은 원래 사각형인 물건이라 실루엣을 셔츠처럼 고치지 않는다. ver B 참가자가
-       * 절반이라 여기만 색종이로 남으면 그게 곧 버전 간 완성도 차이가 되므로, 천
-       * 느낌은 **접힘 두 줄로만** 준다 — 셔츠에 넣은 것과 같은 세기다.
+      body += '<path d="M70,14 L100,54 L130,14" fill="none" stroke="' + edge + '" stroke-width="5" stroke-linejoin="round"/>' +
+        '<path d="M62,10 L100,54 L86,60 Z M138,10 L100,54 L114,60 Z" fill="' + shade + '" opacity=".55" stroke="' + edge + '" stroke-width="3"/>' +
+        '<path d="M100,60 V194" stroke="' + edge + '" stroke-width="4"/>' +
+        '<circle cx="100" cy="92" r="5" fill="' + edge + '"/>' +
+        '<circle cx="100" cy="128" r="5" fill="' + edge + '"/>' +
+        '<circle cx="100" cy="164" r="5" fill="' + edge + '"/>';
+    } else if (kind === 'jeans') {
+      /* 청바지. 셔츠와 같은 규칙으로 그린다 — 좌우는 x=100 대칭, 천이 걸려 있을 때
+       * 생기는 것만 넣는다: 허리에서 엉덩이로 벌어지고, 다리는 밑단으로 좁아지며,
+       * 밑단은 가운데가 살짝 처진다. 직선 사각형 두 개면 바지가 아니라 사다리다.
        *
-       * 밑단을 가운데로 처지게도 해 봤다가 되돌렸다. 클로즈업(holdCloseup)에서 수건이
-       * 화면을 가득 채우는데, 아래가 둥글면 걸린 천이 아니라 **자루나 가방**으로 읽힌다.
-       * 위쪽 걸이 고리까지 있어서 더 그렇다. 셔츠에서 통한 것이 여기서는 안 통한다. */
-      outline = '<rect x="22" y="20" width="156" height="176" rx="12"';
+       * 데님으로 읽히게 하는 것은 실루엣이 아니라 **디테일의 문법**이다 — 허리띠와
+       * 고리, 앞주머니 곡선, 지퍼 앞섶, 바깥 솔기 스티치. 넷 중 둘만 있어도 청바지로
+       * 읽히지만 넷이 다 있어야 클로즈업(장면 1·11 의 S=3)에서 버틴다.
+       *
+       * 이 path 도 clipPath 와 같이 쓴다(얼룩은 밝은 옷에만 걸리지만 규칙은 하나다). */
+      /* 비율 — 밑위(허리~가랑이) 78 · 다리 122. 처음엔 100 : 86 이었는데 스토리보드로
+       * 보니 **반바지**로 읽혔다. 다리가 밑위의 1.5배는 돼야 긴 바지다. */
+      outline = '<path d="M46,6 L154,6' +
+        ' C159,30 165,52 164,74 C163,116 159,160 155,204' +
+        ' C143,208 129,209 117,205 C113,162 108,118 100,84' +
+        ' C92,118 87,162 83,205 C71,209 57,208 45,204' +
+        ' C41,160 37,116 36,74 C35,52 41,30 46,6 Z"';
       body =
-        outline + ' fill="' + fill + '" stroke="' + edge + '" stroke-width="5"/>' +
-        '<rect x="22" y="20" width="42" height="176" rx="12" fill="' + shade + '" opacity=".45"/>' +
-        '<rect x="30" y="128" width="140" height="13" rx="6" fill="' + edge + '"/>' +
-        '<rect x="30" y="152" width="140" height="13" rx="6" fill="' + edge + '" opacity=".7"/>' +
-        // 접힘 두 줄 (셔츠와 같은 세기)
-        '<path d="M78,34 C75,80 75,130 77,186" fill="none" stroke="' + shade +
+        outline + ' fill="' + fill + '" stroke="' + edge + '" stroke-width="5" stroke-linejoin="round"/>' +
+        // 왼 다리 바깥 음영 — 셔츠의 옆선 음영과 같은 자리·같은 세기
+        '<path d="M36,74 C37,116 41,160 45,204 C51,207 57,208 63,208 L60,74 Z"' +
+        ' fill="' + shade + '" opacity=".35"/>' +
+        // 허리띠
+        '<path d="M46,6 L154,6 C155,13 156,20 156,26 L44,26 C44,20 45,13 46,6 Z"' +
+        ' fill="' + shade + '" opacity=".45"/>' +
+        '<path d="M44,26 H156" stroke="' + edge + '" stroke-width="4"/>' +
+        // 벨트 고리 셋
+        '<rect x="59" y="3" width="9" height="26" rx="2" fill="' + edge + '"/>' +
+        '<rect x="95" y="3" width="10" height="26" rx="2" fill="' + edge + '"/>' +
+        '<rect x="132" y="3" width="9" height="26" rx="2" fill="' + edge + '"/>' +
+        // 앞주머니 곡선
+        '<path d="M44,34 C62,36 78,46 86,64 M156,34 C138,36 122,46 114,64"' +
+        ' fill="none" stroke="' + shade + '" stroke-width="4" opacity=".8"/>' +
+        // 앞섶 — 가운데 솔기와 지퍼 덧단
+        '<path d="M100,26 V84" stroke="' + edge + '" stroke-width="4"/>' +
+        '<path d="M100,32 C112,44 112,66 100,80" fill="none" stroke="' + shade + '" stroke-width="3.5" opacity=".7"/>' +
+        // 바깥 솔기 스티치 — 다리를 따라 내려가는 밝은 선 하나씩
+        '<path d="M46,82 C44,120 45,165 49,202" fill="none" stroke="' + shade +
+        '" stroke-width="3.5" stroke-linecap="round" opacity=".6"/>' +
+        '<path d="M154,82 C156,120 155,165 151,202" fill="none" stroke="' + shade +
+        '" stroke-width="3.5" stroke-linecap="round" opacity=".6"/>' +
+        // 접힘 두 줄 (셔츠와 같은 세기) — 다리 안쪽에 하나씩
+        '<path d="M70,96 C68,130 69,170 72,202" fill="none" stroke="' + shade +
         '" stroke-width="6" stroke-linecap="round" opacity=".28"/>' +
-        '<path d="M131,36 C134,82 134,132 132,188" fill="none" stroke="' + shade +
+        '<path d="M130,98 C132,132 131,172 128,204" fill="none" stroke="' + shade +
         '" stroke-width="5" stroke-linecap="round" opacity=".2"/>' +
-        // 아랫단 술
-        '<path d="M32,196 v14 M52,196 v14 M72,196 v14 M92,196 v14 M112,196 v14 M132,196 v14 M152,196 v14 M168,196 v14"' +
-        ' stroke="' + edge + '" stroke-width="5" stroke-linecap="round"/>' +
-        '<path d="M84,20 v-12 a16,16 0 0 1 32,0 v12" fill="none" stroke="' + edge + '" stroke-width="6"/>';
-    } else if (kind === 'socks') {
-      var sock = function (tx, rot) {
-        return '<g transform="translate(' + tx + ',30) rotate(' + rot + ')">' +
-          '<path d="M18,0 H74 V90 Q74,106 88,116 L112,134 Q128,146 116,162 Q104,178 88,166 L34,124 Q18,112 18,92 Z"' +
-          ' fill="' + fill + '" stroke="' + edge + '" stroke-width="5" stroke-linejoin="round"/>' +
-          '<path d="M74,90 Q74,106 88,116 L112,134 Q128,146 116,162 L74,128 Z" fill="' + shade + '" opacity=".45"/>' +
-          '<rect x="18" y="0" width="56" height="22" rx="4" fill="' + shade + '" opacity=".75"/>' +
-          '<path d="M18,26 h56" stroke="' + edge + '" stroke-width="4" opacity=".6"/>' +
-          '</g>';
-      };
-      body = sock(6, -6) + sock(76, 8);
+        // 밑단 스티치
+        '<path d="M47,198 C59,202 71,203 83,200 M117,200 C129,203 141,202 153,198"' +
+        ' fill="none" stroke="' + edge + '" stroke-width="3" opacity=".6"/>';
     }
 
     /* 이염 얼룩.
@@ -616,7 +633,7 @@
      * 모양은 **난수가 아니라 고정 표**로 만든다. 난수를 쓰면 참가자마다 얼룩이
      * 달라지고, 그러면 같은 자극이 아니다. */
     var stain = '';
-    if (o.stained && kind !== 'socks') {
+    if (o.stained) {
       var cid = 'c-garment-' + (++GARMENT_UID);
 
       /* 각도별 반지름 배율. 이 값이 얼룩의 들쭉날쭉함을 만든다. */
@@ -894,10 +911,10 @@
     };
     /* 손이 있을 때는 팔이 프레임 위에서 들어오는 구도라 옷이 화면 가장자리에
      * 걸쳐도 "팔을 따라 들어온 것"으로 읽혔다. 손을 걷어내자 그냥 **잘린 옷**이
-     * 됐다(양말은 왼쪽으로, 셔츠는 오른쪽으로). 둘 다 프레임 안으로 들여놓는다.
+     * 됐다(짙은 옷은 왼쪽으로, 셔츠는 오른쪽으로). 둘 다 프레임 안으로 들여놓는다.
      *
      * 그리는 폭은 상자 폭이 아니라 소매 끝까지다 — 셔츠는 중심에서 ±92·S,
-     * 양말은 -108·S ~ +90·S 다. 이 값으로 잡아야 가장자리에 안 닿는다. */
+     * 청바지는 ±64·S 다. 이 값으로 잡아야 가장자리에 안 닿는다. */
     var dark = put(V.dark.shape, 3.0, 350, 780);
     var light = put(V.light.shape, 4.0, 690, 1120);
     var p = o.cls || 's1';
@@ -1029,9 +1046,7 @@
    * 없어졌고, 남겨 두면 다음 사람이 "손이 어딘가 있나" 하고 찾게 된다. */
   ART.GARMENT_BODY = {
     shirt: { cx: 100, cy: 132 },
-    tee:   { cx: 100, cy: 132 },
-    towel: { cx: 100, cy: 108 },
-    socks: { cx: 114, cy: 119 }
+    jeans: { cx: 100, cy: 106 }
   };
 
   ART.holdCloseup = function (o) {

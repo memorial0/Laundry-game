@@ -1,7 +1,7 @@
 /* 평행 자극 요건 (SPEC 2장 · 7장 수용 기준)
  *  - watch/intervene: 재생 목록이 다르지만(1,2,3,4,10 vs 1~10),
  *    두 조건이 공유하는 장면은 그림·자막·길이가 완전히 같아야 한다
- *  - ver A/B: 소재만 다르고 구조·정보량은 같아야 한다
+ *  - ver A/B: 색조만 다르고 소재·구조·정보량은 같아야 한다
  *  - 과장 표현 금지 · 외부 요청 금지
  */
 'use strict';
@@ -101,14 +101,18 @@ module.exports = async function () {
     t.ok('REDUCED_MOTION' in w.AD_RESULT, '설정값은 로그에만 남는다');
   }
 
-  t.section('ver A = ver B (구조 · 정보량)');
+  /* 소재를 셔츠+청바지로 통일한 뒤(2026-09-11) A 와 B 는 **색조만** 다르다.
+   * 예전에는 소재가 달라 "요소 수가 20% 안에서 비슷하다"로 만족해야 했는데, 지금은
+   * 색값을 지우면 마크업이 글자 단위로 같아야 한다. 어긋나면 누가 B 에만 무엇을
+   * 넣은 것이다. */
+  t.section('ver A = ver B (색값 빼면 마크업 동일)');
   const a = bootArt('A');
   const b = bootArt('B');
+  const uncolor = (svg) => svg.replace(/#[0-9A-Fa-f]{3,8}\b/g, '#');
   for (const n of SCENES) {
-    const ca = countTags(a['s' + n]({}));
-    const cb = countTags(b['s' + n]({}));
-    const rel = Math.abs(ca - cb) / Math.max(ca, cb);
-    t.ok(rel < 0.2, `장면 ${n} 요소 수 유사`, `${ca} vs ${cb}`);
+    const sa = uncolor(a['s' + n]({}));
+    const sb = uncolor(b['s' + n]({}));
+    t.ok(sa === sb, `장면 ${n} 마크업이 색값 외에 동일`, `${sa.length} vs ${sb.length}`);
   }
 
   /* 장면 4(실패 결과)와 8(개선 결과)은 같은 클로즈업이고 stained 값 하나만 다르다.
