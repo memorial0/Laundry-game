@@ -82,6 +82,14 @@ function bootArt(ver) {
 
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
+/** 조건이 참이 될 때까지 기다린다(상한 ms). 고정 대기는 앞 스위트가 띄워 둔 창들의
+ *  타이머에 밀려 넘칠 수 있다 — 장면 5 자막이 실제로 그랬다(rAF 두 번이 80ms 를 넘김). */
+async function waitFor(cond, ms) {
+  const end = Date.now() + (ms || 1000);
+  while (!cond() && Date.now() < end) await wait(5);
+  return cond();
+}
+
 /** 장면 6에서 쓸 포인터 드래그. jsdom에는 PointerEvent가 없어 MouseEvent로 만든다. */
 function dragSheet(window, from, to) {
   const el = window.document.querySelector('.sc6');
@@ -113,4 +121,4 @@ function suite(name) {
   };
 }
 
-module.exports = { APP_DIR, bootPage, bootArt, wait, dragSheet, suite };
+module.exports = { APP_DIR, bootPage, bootArt, wait, waitFor, dragSheet, suite };

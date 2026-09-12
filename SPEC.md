@@ -323,11 +323,12 @@ F0 가 227~259Hz 한 밴드에 몰려 있었고 **실패 장면이 해소 장면
 
 ## 5. 로깅 (행동 로그 시트 스키마와 1:1)
 
-`window.AD_RESULT`에 기록하고, 종료 시 `window.parent.postMessage({type:'AD_DONE', payload}, '*')` + `localStorage['ad_log_'+sid]`에 JSON 저장(둘 다).
+`window.AD_RESULT`에 기록하고, 종료 시 `window.parent.postMessage({type:'AD_DONE', payload}, '*')` + `localStorage['ad_log_'+sid+'_laundry_'+mode]`에 JSON 저장(둘 다). 키에 `stim`·`mode`가 들어가는 이유는 한 참가자(`sid` 하나)가 4블록을 돌기 때문이다(INTEGRATION.md §2).
 
 ```json
 {
-  "sid": "", "mode": "watch|intervene", "ver": "A|B",
+  "sid": "", "stim": "laundry", "mode": "watch|intervene", "ver": "A|B",
+  "block": null,             // 몇 번째 블록인지(1~4). 러너가 `?block=` 으로 준다. 단독 실행이면 null
   "t_start": 0, "t_end": 0,
   "DWELL_TOTAL": 0.0,        // 초, 장면1 시작~종료(또는 CTA 클릭)
   "DWELL_INT": 0.0,          // 장면 6 체류(초). watch는 그 장면이 없어 null

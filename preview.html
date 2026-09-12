@@ -9,7 +9,6 @@
 
   아직 통합 러너(session.html)가 아니다. 없는 것:
     - 로그를 파일이 아니라 수집 서버로 보내기
-    - laundry-ad 의 localStorage 키를 'ad_log_'+sid+'_'+stim+'_'+mode 로 맞추기 (INTEGRATION.md §2)
 
   들어 있는 것: 시작 안내 → 동의서 → 사전 문항 3 → 조작 연습 →
                 (안내 → 자극 → 설문 29 → 휴식) × 4 → 기본 정보 3 → 디브리핑 → 종료.
@@ -1125,7 +1124,8 @@ function attentionReport() {
 function record(payload, note) {
   var b = state.flow[state.step].b;
   var row = Object.assign({}, payload || {});
-  // laundry-ad 는 아직 block 을 읽지 않아 payload 에 없다 (INTEGRATION.md §2 미해결)
+  // 두 자극 모두 stim·block 을 스스로 기록한다(INTEGRATION.md §3). 아래는 옛 판 자극이
+  // 뜨거나 payload 가 비어 왔을 때를 위한 보강이고, 값이 있으면 자극 쪽을 믿는다.
   row.sid = state.sid;
   row.block = b.block;
   if (!row.stim) row.stim = b.stim;

@@ -184,6 +184,7 @@
     mode: pick(qs.get('mode'), [MODES.WATCH, MODES.INTERVENE], MODES.WATCH),
     ver: pick(qs.get('ver'), ['A', 'B'], 'A'),
     sid: qs.get('sid') || randomSid(),
+    block: qs.get('block') ? parseInt(qs.get('block'), 10) : null,  // 몇 번째 블록인지(러너가 준다). 단독 실행이면 null
     debug: qs.get('debug') === '1',
     still: qs.get('still') ? parseInt(qs.get('still'), 10) : null
   };
@@ -1749,12 +1750,18 @@
    * 3. 로그 — 행동 로그 시트 스키마와 1:1 (SPEC 5장)
    * ========================================================== */
 
-  var STORE_KEY = 'ad_log_' + CFG.sid;
+  var STIM = 'laundry';
+  /* 한 참가자(sid 하나)가 4블록을 돌기 때문에 키에 stim·mode 가 들어간다 — sid 만으로
+   * 잡으면 블록마다 덮어써서 백업이 마지막 블록 하나만 남는다. 게임 자극과 같은 꼴이다
+   * (INTEGRATION.md §2). */
+  var STORE_KEY = 'ad_log_' + CFG.sid + '_' + STIM + '_' + CFG.mode;
 
   var LOG = {
     sid: CFG.sid,
+    stim: STIM,
     mode: CFG.mode,
     ver: CFG.ver,
+    block: CFG.block,
     t_start: 0,                                    // epoch ms, 장면 1 시작
     t_end: 0,                                      // epoch ms, 종료(0 = 미완료)
     DWELL_TOTAL: 0,                                // 초
@@ -1816,8 +1823,10 @@
       var st = byNo(LOG.scene_times);
       return {
         sid: LOG.sid,
+        stim: LOG.stim,
         mode: LOG.mode,
         ver: LOG.ver,
+        block: LOG.block,
         t_start: LOG.t_start,
         t_end: LOG.t_end,
         DWELL_TOTAL: LOG.DWELL_TOTAL,

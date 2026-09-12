@@ -14,7 +14,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { bootPage, wait, suite, APP_DIR } = require('./lib/harness');
+const { bootPage, wait, waitFor, suite, APP_DIR } = require('./lib/harness');
 
 /* scenes.js 의 voiceKey() 를 테스트에서 다시 적는다 — 같은 함수를 불러다 쓰면
  * 그 함수가 틀렸을 때 같이 틀린다. 규칙을 독립적으로 진술해 둔다.
@@ -48,8 +48,11 @@ module.exports = async function () {
       let mismatch = null;
       for (const no of NOS) {
         const w = bootPage(`?mode=${mode}&ver=${ver}&still=${no}&sid=v-${mode}${ver}${no}`);
-        await wait(80);
-        const sub = w.document.getElementById('subtitle-text').textContent;
+        /* 자막은 setSubtitle 이 rAF 두 번 뒤에 넣는다. 고정 80ms 로 기다리면 장면 5
+         * (네 장면을 겹쳐 그리는 되감기 화면)가 앞 스위트의 창들에 밀려 가끔 넘쳤다. */
+        const subEl = w.document.getElementById('subtitle-text');
+        await waitFor(() => subEl.textContent, 1000);
+        const sub = subEl.textContent;
         const key = keyFor(no, mode, ver);
         used.add(key);
         const said = w.AD_VOICE_CLIPS.text[key];
