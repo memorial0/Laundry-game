@@ -184,6 +184,7 @@
     mode: pick(qs.get('mode'), [MODES.WATCH, MODES.INTERVENE], MODES.WATCH),
     ver: pick(qs.get('ver'), ['A', 'B'], 'A'),
     sid: qs.get('sid') || randomSid(),
+    block: qs.get('block') ? parseInt(qs.get('block'), 10) : null,  // 몇 번째 블록인지(러너가 준다). 단독 실행이면 null
     debug: qs.get('debug') === '1',
     still: qs.get('still') ? parseInt(qs.get('still'), 10) : null
   };
@@ -251,14 +252,19 @@
     ink: '#10151A', mute: '#56626D'
   };
 
-  // ver B: 배경 색조·밝은 옷의 흰색 온도만 다르다 (소재·구도·길이·정보량 동일)
+  /* ver B: 배경 색조만 다르다 (소재·구도·길이·정보량 동일).
+   *
+   * 셔츠의 흰색은 A 와 같다. 한때 B 의 셔츠를 따뜻한 흰색(#FFFDF9 · 그늘 #EAE1D2)으로
+   * 뒀는데, 셔츠가 화면을 채우는 클로즈업(장면 8·9)에서 **크림색 = 덜 빨린 옷**으로
+   * 읽혔다. "색은 그대로" 라고 말하는 장면의 셔츠가 누레 보이면 개선 결과의 설득력이
+   * B 에서만 떨어지고, 그 참가자가 어느 조건인지에 따라 조건 효과에 섞인다.
+   * 두 판을 갈라 보이게 하는 데는 벽 색조 하나로 충분하다(2026-09-12, 스토리보드 대조). */
   if (CFG.ver === 'B') {
     PAL.wall = '#C0B7AC'; PAL.wallLo = '#9E9488'; PAL.wallHi = '#D8D1C8';
     // A 와 반대로 짠다 — A 는 차가운 벽 + 중성 바닥, B 는 따뜻한 벽 + 차가운 바닥.
     // 둘 다 따뜻하게 두면 화면이 통째로 갈색이 되어 이번에도 흙으로 읽힌다.
     PAL.floor = '#6E7681'; PAL.floorLo = '#515861'; PAL.base = '#2B2F34';
     PAL.wear = '#6B4A3C'; PAL.wearLo = '#4E342A';
-    PAL.light = '#FFFDF9'; PAL.lightEdge = '#C0B49E'; PAL.lightShade = '#EAE1D2';
   }
 
   var ART = {};
@@ -1749,12 +1755,18 @@
    * 3. 로그 — 행동 로그 시트 스키마와 1:1 (SPEC 5장)
    * ========================================================== */
 
-  var STORE_KEY = 'ad_log_' + CFG.sid;
+  var STIM = 'laundry';
+  /* 한 참가자(sid 하나)가 4블록을 돌기 때문에 키에 stim·mode 가 들어간다 — sid 만으로
+   * 잡으면 블록마다 덮어써서 백업이 마지막 블록 하나만 남는다. 게임 자극과 같은 꼴이다
+   * (INTEGRATION.md §2). */
+  var STORE_KEY = 'ad_log_' + CFG.sid + '_' + STIM + '_' + CFG.mode;
 
   var LOG = {
     sid: CFG.sid,
+    stim: STIM,
     mode: CFG.mode,
     ver: CFG.ver,
+    block: CFG.block,
     t_start: 0,                                    // epoch ms, 장면 1 시작
     t_end: 0,                                      // epoch ms, 종료(0 = 미완료)
     DWELL_TOTAL: 0,                                // 초
@@ -1816,8 +1828,10 @@
       var st = byNo(LOG.scene_times);
       return {
         sid: LOG.sid,
+        stim: LOG.stim,
         mode: LOG.mode,
         ver: LOG.ver,
+        block: LOG.block,
         t_start: LOG.t_start,
         t_end: LOG.t_end,
         DWELL_TOTAL: LOG.DWELL_TOTAL,

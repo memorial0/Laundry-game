@@ -38,8 +38,9 @@ localStorage['ad_log_' + sid + '_' + stim + '_' + mode] = JSON.stringify(payload
 `postMessage`가 유일한 정식 경로다. localStorage는 러너가 죽었을 때를 위한 백업이며,
 키에 `stim`·`mode`가 들어가는 이유는 한 참가자(`sid` 하나)가 4블록을 돌기 때문이다.
 
-> **미해결:** `laundry-ad/scenes.js`는 아직 `'ad_log_' + sid` 만 쓴다(블록 간 덮어씀).
-> 러너 작업 때 위 규격으로 맞춘다.
+두 자극 모두 이 키를 쓴다. 세탁은 2026-09-12 까지 `'ad_log_' + sid` 만 써서 4블록을 도는
+동안 백업이 마지막 블록 하나로 덮였다(정식 경로인 postMessage 는 영향이 없었다). 같은 날
+`stim`·`block` 필드도 세탁 payload 에 들어갔다 — 그전까지는 러너가 `record()` 에서 채워 넣었다.
 
 ### 재생 순서 — `scene_order` (세탁만)
 

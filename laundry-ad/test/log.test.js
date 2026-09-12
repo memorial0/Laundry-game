@@ -2,7 +2,8 @@
 'use strict';
 const { bootPage, wait, dragSheet, suite } = require('./lib/harness');
 
-const SCHEMA = ['sid', 'mode', 'ver', 't_start', 't_end', 'DWELL_TOTAL', 'DWELL_INT',
+// 게임 자극과 같은 머리(sid·stim·mode·ver·block) — INTEGRATION.md §3
+const SCHEMA = ['sid', 'stim', 'mode', 'ver', 'block', 't_start', 't_end', 'DWELL_TOTAL', 'DWELL_INT',
   'INT_DONE', 'INT_ATTEMPTS', 'T_FIRST_DRAG', 'T_MANIP', 'T_REWIND', 'HINT_SHOWN', 'CTA_CLICK',
   // 오른쪽 위 [×] — CTA 와 짝이 되는 행동. 둘 다 0 이면 8초가 지나 저절로 끝난 것이다
   'CLOSE_CLICK', 'T_CARD',
@@ -17,7 +18,7 @@ module.exports = async function () {
   const t = suite('로깅 · AD_RESULT');
 
   t.section('watch — 장면 10 자동 종료');
-  const a = bootPage('?mode=watch&ver=A&sid=log-w');
+  const a = bootPage('?mode=watch&ver=A&sid=log-w&block=3');
   await wait(120);
   const E = a.AD_ENGINE;
   for (let i = 0; i < 10; i++) { E.next(); await wait(12); }
@@ -27,13 +28,15 @@ module.exports = async function () {
   const p = done(a);
   t.ok(!!p, 'postMessage AD_DONE 수신');
   t.ok(JSON.stringify(Object.keys(p)) === JSON.stringify(SCHEMA), '스키마 키·순서 1:1', Object.keys(p));
-  const stored = a.localStorage.getItem('ad_log_log-w');
-  t.ok(!!stored, "localStorage['ad_log_log-w'] 저장");
+  /* 키에 stim·mode 가 들어간다 — 한 sid 가 4블록을 돌기 때문(INTEGRATION.md §2) */
+  const stored = a.localStorage.getItem('ad_log_log-w_laundry_watch');
+  t.ok(!!stored, "localStorage['ad_log_log-w_laundry_watch'] 저장");
   t.ok(stored === JSON.stringify(p), 'localStorage 내용 = payload');
   t.ok(a.AD_LOG.storeOk === true, '저장 성공 플래그');
   t.ok(a.AD_RESULT_JSON === stored, 'window.AD_RESULT_JSON 동기화');
   t.ok(p.sid === 'log-w' && p.mode === 'watch' && p.ver === 'A', 'sid/mode/ver 그대로 기록',
     [p.sid, p.mode, p.ver]);
+  t.ok(p.stim === 'laundry' && p.block === 3, 'stim = laundry · block 그대로 기록', [p.stim, p.block]);
   t.ok(p.INT_DONE === null, 'watch → INT_DONE null(공란)');
   t.ok(p.DWELL_INT === null, 'watch → DWELL_INT null(장면 6 자체가 없음)', p.DWELL_INT);
   t.ok(p.T_FIRST_DRAG === null && p.T_MANIP === null, 'watch → 조작 지표 null(공란)');
@@ -155,11 +158,12 @@ module.exports = async function () {
   await wait(120);
   d.dispatchEvent(new d.Event('pagehide'));
   await wait(20);
-  const raw = d.localStorage.getItem('ad_log_log-x');
+  const raw = d.localStorage.getItem('ad_log_log-x_laundry_watch');
   t.ok(!!raw, '이탈 시에도 localStorage 저장');
   const p4 = JSON.parse(raw || '{}');
   t.ok(p4.t_end === 0, '미완료는 t_end = 0', p4.t_end);
   t.ok(JSON.stringify(Object.keys(p4)) === JSON.stringify(SCHEMA), '이탈 로그도 같은 스키마');
+  t.ok(p4.block === null, '단독 실행(block 없음)은 null (0 아님)', p4.block);
   t.ok(d.__messages.filter(m => m && m.type === 'AD_DONE').length === 0, '이탈은 AD_DONE 전송 안 함');
 
   const e = bootPage('?mode=watch');
