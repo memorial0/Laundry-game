@@ -591,6 +591,88 @@
     return errs;
   }
 
+  /* ==========================================================
+   * 러너와의 계약 — 이 문항 은행이 쓰는 종류를 러너가 그릴 줄 아는가
+   *
+   * validate() 로는 못 잡는 사고가 있다. validate() 는 설문이 스스로를 보는 검사라,
+   * **러너가 낡은** 경우에는 설문 쪽에서 아무 문제도 안 보인다. 실제로 그렇게 샜다 —
+   * 서술형(type:'text') 분기가 생기기 전 러너에 이 설문이 물리면, 러너의 마지막 else 가
+   * 모르는 종류를 전부 받아 7점 척도로 그렸다. 자유 서술 문항 자리에 1~7 눈금이 뜨고,
+   * 참가자는 아무 숫자나 누르고 지나간다. 화면은 멀쩡해 보여서 자료를 열기 전에는 모른다.
+   *
+   * 그래서 **설문 쪽에서도** 본다. 러너는 자기가 그릴 줄 아는 종류를 window.SURVEY_RUNNER
+   * 에 적어 두기로 했고, 그게 없거나 모자라면 여기서 화면을 덮어 시작을 막는다.
+   * 러너 쪽 검사(unrenderable)와 방향이 반대다 — 둘 중 어느 파일이 낡아도 하나는 걸린다.
+   * ========================================================== */
+
+  var TYPES_USED = (function () {
+    var seen = [];
+    [].concat(PRE, BLOCK_ITEMS, [ATTENTION], DEMO, [DEBRIEF_WITHDRAW]).forEach(function (it) {
+      if (it && seen.indexOf(it.type) < 0) seen.push(it.type);
+    });
+    return seen;
+  })();
+
+  function runnerMismatch() {
+    var r = (typeof window !== 'undefined') && window.SURVEY_RUNNER;
+    if (!r || !r.renders) return '이 화면(러너)이 설문보다 낡았습니다';
+    var missing = TYPES_USED.filter(function (t) { return r.renders.indexOf(t) < 0; });
+    return missing.length ? '이 화면이 못 그리는 문항 종류: ' + missing.join(', ') : null;
+  }
+
+  /** 화면을 덮는다. 경고만 띄우고 두면 참가자는 그냥 진행하고, 우리는 못 쓰는 자료를 모은다.
+   *
+   * body 를 갈아 끼우지 않고 **위에 덮는다.** 갈아 끼우면 두 가지가 깨진다 —
+   * ① 러너가 나중에 그리는 화면(자극 존재 확인이 끝난 뒤의 시작 화면)이 이 경고를 지운다.
+   *    그 fetch 가 언제 돌아오느냐에 따라 막히기도 하고 안 막히기도 하는, 가장 나쁜 꼴이 된다.
+   * ② 러너가 찾던 요소(#root · #next)가 사라져 엉뚱한 예외가 먼저 터진다.
+   * 덮개로 두면 러너는 제 할 일을 하되 참가자 눈에는 이 경고만 보인다. */
+  function blockScreen(why) {
+    var d = window.document;
+    if (d.getElementById('survey-mismatch')) return;   // 두 번 덮지 않는다
+    var box = d.createElement('div');
+    box.id = 'survey-mismatch';
+    box.setAttribute('style',
+      'position:fixed;inset:0;z-index:2147483647;overflow:auto;background:#eef1f5;' +
+      'font:16px/1.65 system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif;color:#1b1f27');
+    box.innerHTML =
+      '<div style="max-width:560px;margin:14vh auto;padding:0 20px">' +
+      '<div style="border:2px dashed #b91c1c;border-radius:12px;padding:20px 18px;color:#b91c1c">' +
+      '<b>설문을 시작할 수 없습니다.</b><br>' +
+      '화면과 설문 문항의 판이 어긋났습니다 — ' + why + '.<br><br>' +
+      '브라우저 캐시를 비우고 새로 고쳐 주세요. 휴대폰이라면 탭을 닫았다가 다시 여세요. ' +
+      '그래도 같은 화면이 나오면 연구원에게 알려 주세요.' +
+      '</div></div>';
+    /* body 가 아니라 최상위에 붙인다 — 러너가 body 안을 다시 그려도 덮개는 남는다 */
+    (d.documentElement || d.body).appendChild(box);
+
+    /* 덮개는 마우스를 막지만 키보드는 못 막는다. Tab 으로 밑의 '시작' 버튼에 닿아
+     * Enter 를 누르면 그대로 시작된다 — 덮어 놓고 시작되는 것이 제일 나쁘다.
+     * 잡는 단계(capture)에서 덮개 밖의 클릭·키를 끊는다. */
+    ['click', 'keydown', 'keyup', 'submit'].forEach(function (type) {
+      d.addEventListener(type, function (e) {
+        if (box.contains(e.target)) return;
+        e.stopPropagation();
+        if (e.preventDefault) e.preventDefault();
+      }, true);
+    });
+  }
+
+  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    /* 러너의 인라인 스크립트가 window.SURVEY_RUNNER 를 적은 **뒤에** 본다.
+     * 보통은 DOMContentLoaded 면 충분하고, 이미 읽기가 끝난 뒤에 이 파일이 실행되는
+     * 경우(검사 하네스)를 위해 setTimeout 길도 둔다. */
+    var check = function () {
+      var why = runnerMismatch();
+      if (why) {
+        if (window.console && console.error) console.error('[설문] ' + why);
+        blockScreen(why);
+      }
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', check);
+    else setTimeout(check, 0);
+  }
+
   var api = {
     SUBSCALES: SUBSCALES,
     STUDY_TITLE: STUDY_TITLE, DURATION_TEXT: DURATION_TEXT,
@@ -607,6 +689,7 @@
     ATTENTION: ATTENTION, ATTENTION_BLOCKS: ATTENTION_BLOCKS,
     DEMO: DEMO, DEMO_INSTRUCTION: DEMO_INSTRUCTION, CLOSING: CLOSING,
     DEFAULT_SCALE: DEFAULT_SCALE, LIKERT_TICKS: LIKERT_TICKS,
+    TYPES_USED: TYPES_USED, runnerMismatch: runnerMismatch,
     stemFor: stemFor,
     recode: recode, subscaleMean: subscaleMean, itemById: itemById, validate: validate
   };

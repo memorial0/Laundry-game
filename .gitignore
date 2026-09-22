@@ -8,3 +8,6 @@ dist/
 # 스토리보드 추출물 — npm run storyboard 가 만든다 (IRB 별첨용, 1.9MB)
 laundry-ad/test/out/
 __pycache__/
+
+# 러너·설문 테스트가 만드는 임시 폴더
+test/.tmp-*

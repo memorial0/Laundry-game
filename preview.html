@@ -44,6 +44,7 @@
     --warn: #c2410c;
     --warn-soft: #fff2e8;
     --ok: #15803d;
+    --bad: #b91c1c;   /* 고장 — 경고(--warn)보다 세다. 그냥 지나가면 안 되는 자리에만 쓴다 */
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -143,6 +144,16 @@
   }
   button:hover { background: #1d4ed8; }
   button.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+  button:disabled { background: transparent; color: var(--dim); border: 1px solid var(--line); cursor: not-allowed; }
+  button:disabled:hover { background: transparent; }
+
+  /* 러너가 못 그리는 문항 자리. 눈금처럼 **그럴듯해 보이면 안 된다** —
+   * 참가자가 아무 숫자나 누르고 지나가는 것이 이 표시가 막으려는 일이다. */
+  .broken {
+    border: 2px dashed var(--bad); border-radius: 10px;
+    padding: 12px 14px; color: var(--bad); font-size: 14.5px; line-height: 1.55;
+  }
+  .broken .mono { display: block; margin-top: 4px; opacity: .8; }
   button.ghost:hover { background: #e3e8ef; }
 
   /* ---------- 안내·시작·종료 ---------- */
@@ -255,8 +266,14 @@
 
 <!-- ?v= 는 캐시 깨기용이다. 문구를 고쳤는데 옛 화면이 그대로 나오면 이 숫자를 올린다.
      헤더로 캐시를 꺼도, 이미 열려 있는 화면은 처음 받은 파일로 계속 돈다. -->
-<script src="survey.js?v=4"></script>
-<script src="practice.js?v=4"></script>
+<!-- ?v= 는 build.mjs 가 배포할 때 **파일 내용의 해시로 바꿔 넣는다**.
+     손으로 번호를 올리던 시절에는 v=4 가 2026-08-13 이후 한 번도 안 올라갔고,
+     그동안 survey.js 는 다섯 번 바뀌었다. 주소가 그대로면 브라우저는 옛 파일을
+     계속 쓸 명분이 있고, 그러면 이 화면과 설문이 서로 다른 시점의 것으로 섞인다.
+     (그때 자유 서술 문항이 7점 척도로 그려졌다 — 지금은 unrenderable() 이 막는다.)
+     아래 dev 라는 글자를 고치지 말 것. build.mjs 가 이 글자를 찾아 바꾼다. -->
+<script src="survey.js?v=dev"></script>
+<script src="practice.js?v=dev"></script>
 <script>
 'use strict';
 
@@ -324,6 +341,7 @@ var state = {
   withPractice: qs.get('practice') !== '0',   // 연습 건너뛰기 — 미리보기 전용
   lenient: qs.get('lenient') === '1',   // 미응답 허용 — 미리보기 전용
   group: 0, seq: [], flow: [], step: 0, saved: false, saveError: null,
+  blocked: false,                       // 러너와 설문의 판이 어긋남 — 시작을 막는다
   declined: false,                      // 동의서에서 참여를 거절함 — 여기서 흐름이 끝난다
   resp: { pre: {}, demo: {}, blocks: {}, attention: {}, consent: null, debrief: {} },
   practice: null,
@@ -450,6 +468,31 @@ function urlFor(b) {
  * 라디오 input 은 그대로 두고(키보드·접근성) 눈에 보이는 것만 span 으로 그린다.
  * ========================================================== */
 
+/* 이 러너가 그릴 줄 아는 문항 종류. renderItem 의 분기와 한 벌이다 —
+ * 분기를 늘리면 여기도 늘린다. survey.js 에 이 목록에 없는 종류가 있으면
+ * 러너가 설문보다 낡았다는 뜻이고, unrenderable() 이 시작을 막는다. */
+var RENDERABLE = ['likert', 'sd', 'choice', 'text'];
+
+/* 설문 쪽에도 알린다. survey.js 가 이걸 보고, 자기가 쓰는 종류를 이 러너가 못 그리면
+ * 화면을 덮어 시작을 막는다 — **이 러너가 낡은 경우**를 잡는 길이다(아래 unrenderable()
+ * 은 반대로 survey.js 가 낡은 경우를 잡는다). 둘 중 어느 쪽이 낡아도 하나는 걸린다.
+ * 이 줄을 지우면 survey.js 는 이 러너를 낡은 것으로 보고 시작을 막는다. */
+window.SURVEY_RUNNER = { renders: RENDERABLE };
+
+/** 러너가 못 그리는 문항을 찾는다 — 빈 배열이 아니면 러너와 survey.js 의 판이 어긋난 것이다.
+ *
+ * 왜 survey.js 의 validate() 로는 부족한가. validate() 는 설문이 **스스로를** 검사한다.
+ * 낡은 러너 + 새 설문 조합에서 틀린 쪽은 설문이 아니라 러너라서, 설문 안에서는 아무 문제도
+ * 안 보인다. 어긋남은 두 파일을 마주 놓고 봐야만 드러난다. */
+function unrenderable() {
+  var all = [].concat(S.PRE, S.BLOCK_ITEMS, [S.ATTENTION], S.DEMO, [S.DEBRIEF_WITHDRAW]);
+  var bad = [];
+  all.forEach(function (it) {
+    if (it && RENDERABLE.indexOf(it.type) < 0) bad.push(it.id + ' (type=' + it.type + ')');
+  });
+  return bad;
+}
+
 function optButtons(item, scope, value) {
   var out = '';
   for (var v = 1; v <= item.scale; v++) {
@@ -487,7 +530,7 @@ function renderItem(item, no, scope, value, stim) {
         '<span>' + esc(o) + '</span></label>';
     }).join('');
     body = '<div class="choice">' + opts + '</div>';
-  } else {
+  } else if (item.type === 'likert') {
     body = optButtons(item, scope, value);
     // 눈금 라벨이 기본(동의형)과 다른 문항용. 화면 위 고정 라벨은 한 페이지에 한 벌뿐이라
     // 그런 문항을 대신해 주지 못하므로, 의미변별의 양극 라벨과 같은 자리에 문항마다 붙인다.
@@ -496,6 +539,22 @@ function renderItem(item, no, scope, value, stim) {
       body += '<div class="poles"><span>' + esc(item.ticks[1]) + '</span>' +
         '<span>' + esc(item.ticks[item.scale]) + '</span></div>';
     }
+  } else {
+    /* 모르는 종류는 **절대 눈금으로 그리지 않는다.**
+     *
+     * 예전에는 여기가 그냥 else 라서 optButtons() 로 떨어졌다. 그래서 러너가 survey.js
+     * 보다 낡으면 — 이를테면 서술형(type:'text') 분기가 생기기 전 러너에 지금 설문이
+     * 물리면 — 자유 서술 문항이 1~7 짜리 7점 척도로 그려졌다. 화면은 멀쩡해 보이고
+     * 참가자는 아무 숫자나 누르며, 소감 자리에 숫자가 들어온 것을 자료를 열어 볼 때까지
+     * 아무도 모른다. 조용히 틀린 자료를 모으느니 눈에 띄게 고장 나야 한다.
+     *
+     * 아래 unrenderable() 이 시작 화면에서 미리 막지만, 그 문이 뚫려도 여기서 걸린다. */
+    if (window.console && console.error) {
+      console.error('[설문] 이 러너가 모르는 문항 종류: ' + item.id + ' (type=' + item.type + ')' +
+                    ' — 러너와 survey.js 의 판이 어긋났습니다.');
+    }
+    body = '<div class="broken">이 문항을 표시할 수 없습니다 — 연구원에게 알려 주세요. ' +
+      '<span class="mono">' + esc(item.id) + ' / type=' + esc(String(item.type)) + '</span></div>';
   }
 
   var text = S.stemFor(item, stim);
@@ -578,9 +637,18 @@ function chrome(crumb, pct, body, footLeft, footBtn) {
 /** 응답 개수 표시를 갱신하고, 라디오를 누를 때마다 미응답 표시를 지운다 */
 function wireCounter(scope, items) {
   var el = document.getElementById('count');
+
+  /* 분모는 화면의 문항 수가 아니라 **필수 문항 수**다.
+   *
+   * items.length 로 세면 선택 문항(서술형 소감)이 이미 답한 것처럼 잡힌다. 실제로
+   * 기본 정보 화면이 아무것도 안 고른 상태에서 "1 / 3 응답" 으로 시작하고, 둘을 다
+   * 고르면 "모두 응답했습니다" 로 건너뛰어 "3 / 3" 은 영영 안 나왔다. 위 unanswered()
+   * 가 선택 문항을 빼고 세므로 분모도 같은 자로 재야 앞뒤가 맞는다. */
+  var required = items.filter(function (it) { return !it.optional; }).length;
+
   function update() {
     var left = unanswered(scope, items).length;
-    el.textContent = left ? (items.length - left) + ' / ' + items.length + ' 응답'
+    el.textContent = left ? (required - left) + ' / ' + required + ' 응답'
                           : '모두 응답했습니다';
     el.className = 'count' + (left ? '' : ' done');
   }
@@ -705,6 +773,16 @@ function showStart(warning) {
     document.getElementById('dbg').onchange = function (e) { state.debug = e.target.checked; };
     document.getElementById('len').onchange = function (e) { state.lenient = e.target.checked; };
   }
+  /* 판이 어긋났으면 시작 자체를 막는다. 경고문만 띄우고 버튼을 살려 두면
+   * 참가자는 그냥 누르고, 우리는 못 쓰는 자료를 한 사람분 더 모은다. */
+  if (state.blocked) {
+    var nb = document.getElementById('next');
+    nb.disabled = true;
+    nb.classList.add('ghost');
+    nb.textContent = '시작할 수 없음';
+    return;
+  }
+
   document.getElementById('next').onclick = function () {
     state.sid = document.getElementById('sid').value.trim() || state.sid;
     state.group = groupOf(state.sid);       // 식별 번호가 바뀌면 순서도 바뀐다
@@ -1262,7 +1340,20 @@ function download(name, text, mime) {
 state.group = groupOf(state.sid);
 state.seq = buildSeq();
 
-if (location.protocol === 'file:') {
+/* 러너와 survey.js 의 판이 어긋났으면 여기서 멈춘다.
+ *
+ * 이 검사가 없던 동안 실제로 새는 구멍이 있었다 — 서술형 분기가 생기기 전 러너에
+ * 지금 설문이 물리면 자유 서술 문항이 7점 척도로 그려졌고, 화면만 봐서는 멀쩡했다.
+ * 브라우저가 index.html 과 survey.js 를 서로 다른 시점의 것으로 캐시하면 참가자
+ * 한 사람에게만 그런 일이 생길 수 있으므로, 시작 전에 한 번 마주 놓고 본다. */
+var MISMATCH = unrenderable();
+if (MISMATCH.length) {
+  state.blocked = true;
+  showStart('이 화면(러너)과 설문 문항의 판이 어긋났습니다 — <b>시작할 수 없습니다.</b> ' +
+            '브라우저 캐시를 비우고 새로 고치시고(휴대폰은 탭을 닫았다 여세요), ' +
+            '그래도 같으면 연구원에게 알려 주세요. ' +
+            '<span class="mono">' + MISMATCH.map(esc).join(' · ') + '</span>');
+} else if (location.protocol === 'file:') {
   showStart('file:// 로 열면 iframe 이 차단됩니다. 저장소 루트에서 ' +
             '<span class="mono">python3 -m http.server 8000</span> 을 띄우고 ' +
             '<span class="mono">http://localhost:8000/preview.html</span> 로 여세요.');
