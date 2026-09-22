@@ -620,18 +620,42 @@
     return missing.length ? '이 화면이 못 그리는 문항 종류: ' + missing.join(', ') : null;
   }
 
-  /** 화면을 덮는다. 경고만 띄우고 두면 참가자는 그냥 진행하고, 우리는 못 쓰는 자료를 모은다. */
+  /** 화면을 덮는다. 경고만 띄우고 두면 참가자는 그냥 진행하고, 우리는 못 쓰는 자료를 모은다.
+   *
+   * body 를 갈아 끼우지 않고 **위에 덮는다.** 갈아 끼우면 두 가지가 깨진다 —
+   * ① 러너가 나중에 그리는 화면(자극 존재 확인이 끝난 뒤의 시작 화면)이 이 경고를 지운다.
+   *    그 fetch 가 언제 돌아오느냐에 따라 막히기도 하고 안 막히기도 하는, 가장 나쁜 꼴이 된다.
+   * ② 러너가 찾던 요소(#root · #next)가 사라져 엉뚱한 예외가 먼저 터진다.
+   * 덮개로 두면 러너는 제 할 일을 하되 참가자 눈에는 이 경고만 보인다. */
   function blockScreen(why) {
     var d = window.document;
-    d.body.innerHTML =
-      '<div style="max-width:560px;margin:14vh auto;padding:0 20px;' +
-      'font:16px/1.65 system-ui,-apple-system,\'Apple SD Gothic Neo\',sans-serif;color:#1b1f27">' +
+    if (d.getElementById('survey-mismatch')) return;   // 두 번 덮지 않는다
+    var box = d.createElement('div');
+    box.id = 'survey-mismatch';
+    box.setAttribute('style',
+      'position:fixed;inset:0;z-index:2147483647;overflow:auto;background:#eef1f5;' +
+      'font:16px/1.65 system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif;color:#1b1f27');
+    box.innerHTML =
+      '<div style="max-width:560px;margin:14vh auto;padding:0 20px">' +
       '<div style="border:2px dashed #b91c1c;border-radius:12px;padding:20px 18px;color:#b91c1c">' +
       '<b>설문을 시작할 수 없습니다.</b><br>' +
       '화면과 설문 문항의 판이 어긋났습니다 — ' + why + '.<br><br>' +
       '브라우저 캐시를 비우고 새로 고쳐 주세요. 휴대폰이라면 탭을 닫았다가 다시 여세요. ' +
       '그래도 같은 화면이 나오면 연구원에게 알려 주세요.' +
       '</div></div>';
+    /* body 가 아니라 최상위에 붙인다 — 러너가 body 안을 다시 그려도 덮개는 남는다 */
+    (d.documentElement || d.body).appendChild(box);
+
+    /* 덮개는 마우스를 막지만 키보드는 못 막는다. Tab 으로 밑의 '시작' 버튼에 닿아
+     * Enter 를 누르면 그대로 시작된다 — 덮어 놓고 시작되는 것이 제일 나쁘다.
+     * 잡는 단계(capture)에서 덮개 밖의 클릭·키를 끊는다. */
+    ['click', 'keydown', 'keyup', 'submit'].forEach(function (type) {
+      d.addEventListener(type, function (e) {
+        if (box.contains(e.target)) return;
+        e.stopPropagation();
+        if (e.preventDefault) e.preventDefault();
+      }, true);
+    });
   }
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
